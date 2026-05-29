@@ -3,8 +3,9 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views import View
 from django.db.utils import DatabaseError, OperationalError, ProgrammingError
+from django.db.models import Prefetch
 
-from .models import ProfileDetail, SocialLink
+from .models import Company, ExperienceRole, ProfileDetail, Skill, SkillCategory, SocialLink
 
 
 NOT_ADDED = 'Not Added'
@@ -20,6 +21,43 @@ def get_active_profile():
 def get_active_social_links():
     try:
         return SocialLink.objects.filter(is_active=True).exclude(url='').order_by('name')
+    except (DatabaseError, OperationalError, ProgrammingError):
+        return []
+
+
+def get_active_companies():
+    try:
+        return (
+            Company.objects
+            .filter(is_active=True, roles__is_active=True)
+            .prefetch_related(Prefetch(
+                'roles',
+                queryset=ExperienceRole.objects.filter(is_active=True).order_by(
+                    'display_order',
+                    '-start_year',
+                    '-start_month',
+                    'role',
+                ),
+            ))
+            .distinct()
+            .order_by('display_order', 'name')
+        )
+    except (DatabaseError, OperationalError, ProgrammingError):
+        return []
+
+
+def get_active_skill_categories():
+    try:
+        return (
+            SkillCategory.objects
+            .filter(is_active=True, skills__is_active=True)
+            .prefetch_related(Prefetch(
+                'skills',
+                queryset=Skill.objects.filter(is_active=True).order_by('display_order', 'name'),
+            ))
+            .distinct()
+            .order_by('display_order', 'name')
+        )
     except (DatabaseError, OperationalError, ProgrammingError):
         return []
 
@@ -93,6 +131,92 @@ def build_social_links():
     return social_links
 
 
+def format_role_duration(role):
+    start = f'{role.get_start_month_display()} {role.start_year}'
+    end = (
+        f'{role.get_end_month_display()} {role.end_year}'
+        if role.end_month and role.end_year
+        else 'Present'
+    )
+    return f'{start} - {end}'
+
+
+def parse_description_points(description):
+    points = []
+    paragraphs = []
+
+    for line in description.splitlines():
+        cleaned_line = line.strip()
+
+        if not cleaned_line:
+            continue
+
+        if cleaned_line.startswith('-'):
+            points.append(cleaned_line.lstrip('-').strip())
+        elif points:
+            points[-1] = f'{points[-1]} {cleaned_line}'
+        else:
+            paragraphs.append(cleaned_line)
+
+    return points, paragraphs
+
+
+def build_companies():
+    companies = []
+
+    for company in get_active_companies():
+        roles = []
+
+        for role in company.roles.all():
+            bullet_points, paragraphs = parse_description_points(role.description)
+            preview_text = ' '.join(bullet_points or paragraphs)
+
+            roles.append({
+                'role': role.role,
+                'timeframe': format_role_duration(role),
+                'description': role.description.strip(),
+                'preview': preview_text,
+                'bullet_points': bullet_points,
+                'paragraphs': paragraphs,
+            })
+
+        if roles:
+            companies.append({
+                'company': company.name,
+                'logo': company.company_logo.url if company.display_logo and company.company_logo else '',
+                'roles': roles,
+            })
+
+    return companies
+
+
+def build_skill_categories():
+    skill_categories = []
+
+    for category in get_active_skill_categories():
+        skills = []
+
+        for skill in category.skills.all():
+            if not skill.is_active:
+                continue
+
+            skills.append({
+                'name': skill.name,
+                'logo': skill.logo.url if skill.logo else skill.auto_logo_url,
+                'has_uploaded_logo': bool(skill.logo),
+                'initial': skill.name[:1].upper(),
+                'display_order': skill.display_order,
+            })
+
+        if skills:
+            skill_categories.append({
+                'name': category.name,
+                'skills': skills,
+            })
+
+    return skill_categories
+
+
 class HomeView(View):
     template_name = 'core/home.html'
 
@@ -113,6 +237,7 @@ class HomeView(View):
             'first_name': name.split()[0] if name and NOT_ADDED not in name else NOT_ADDED,
             'role': role,
             'avatar': profile.profile_picture.url if profile and profile.profile_picture else '',
+            'resume': profile.resume.url if profile and profile.resume else '',
             'fallback_avatar': 'images/avatar.jpg',
             'email': 'example@gmail.com',
             'location': location,
@@ -120,6 +245,68 @@ class HomeView(View):
         }
 
         social_links = build_social_links()
+        skill_categories = build_skill_categories()
+        companies = build_companies()
+        fallback_companies = [
+            {
+                'company': 'FLY',
+                'logo': '',
+                'roles': [
+                    {
+                        'timeframe': 'January 2022 - Present',
+                        'role': 'Senior Design Engineer',
+                        'description': 'Redesigned the UI/UX for the FLY platform and integrated AI tools into design workflows.',
+                        'preview': 'Redesigned the UI/UX for the FLY platform and integrated AI tools into design workflows.',
+                        'bullet_points': ['Redesigned the UI/UX for the FLY platform.', 'Integrated AI tools into design workflows.'],
+                        'paragraphs': [],
+                    },
+                    {
+                        'timeframe': 'June 2021 - December 2021',
+                        'role': 'Design Intern',
+                        'description': 'Supported design delivery and assisted with interface documentation.',
+                        'preview': 'Supported design delivery and assisted with interface documentation.',
+                        'bullet_points': ['Supported design delivery.', 'Assisted with interface documentation.'],
+                        'paragraphs': [],
+                    },
+                ],
+            },
+        ]
+        fallback_skill_categories = [
+            {
+                'name': 'Frontend',
+                'skills': [
+                    {
+                        'name': 'JavaScript',
+                        'logo': 'https://cdn.simpleicons.org/javascript',
+                        'has_uploaded_logo': False,
+                        'initial': 'J',
+                    },
+                    {
+                        'name': 'Bootstrap',
+                        'logo': 'https://cdn.simpleicons.org/bootstrap',
+                        'has_uploaded_logo': False,
+                        'initial': 'B',
+                    },
+                ],
+            },
+            {
+                'name': 'Backend',
+                'skills': [
+                    {
+                        'name': 'Python',
+                        'logo': 'https://cdn.simpleicons.org/python',
+                        'has_uploaded_logo': False,
+                        'initial': 'P',
+                    },
+                    {
+                        'name': 'Django',
+                        'logo': 'https://cdn.simpleicons.org/django',
+                        'has_uploaded_logo': False,
+                        'initial': 'D',
+                    },
+                ],
+            },
+        ]
 
         about = {
             'intro': {
@@ -128,33 +315,7 @@ class HomeView(View):
             },
             'work': {
                 'title': 'Experience',
-                'experiences': [
-                    {
-                        'company': 'FLY',
-                        'timeframe': '2022 - Present',
-                        'role': 'Senior Design Engineer',
-                        'achievements': [
-                            'Redesigned the UI/UX for the FLY platform, resulting in a 20% increase in user engagement and 30% faster load times.',
-                            'Spearheaded the integration of AI tools into design workflows, enabling designers to iterate 50% faster.',
-                        ],
-                        'images': [
-                            {
-                                'src': 'images/projects/project-01/cover-01.jpg',
-                                'alt': 'Once UI project cover',
-                            },
-                        ],
-                    },
-                    {
-                        'company': 'Creativ3',
-                        'timeframe': '2018 - 2022',
-                        'role': 'Lead Designer',
-                        'achievements': [
-                            'Developed a design system that unified the brand across multiple platforms, improving design consistency by 40%.',
-                            'Led a cross-functional team to launch a new product line, contributing to a 15% increase in overall company revenue.',
-                        ],
-                        'images': [],
-                    },
-                ],
+                'companies': companies or fallback_companies,
             },
             'studies': {
                 'title': 'Studies',
@@ -171,34 +332,7 @@ class HomeView(View):
             },
             'technical': {
                 'title': 'Skills',
-                'skills': [
-                    {
-                        'title': 'Figma',
-                        'description': 'Able to prototype in Figma with Once UI with unnatural speed.',
-                        'tags': ['Figma'],
-                        'images': [
-                            {
-                                'src': 'images/projects/project-01/cover-02.jpg',
-                                'alt': 'Figma project preview',
-                            },
-                            {
-                                'src': 'images/projects/project-01/cover-03.jpg',
-                                'alt': 'Design system preview',
-                            },
-                        ],
-                    },
-                    {
-                        'title': 'Next.js',
-                        'description': 'Building next generation apps with Next.js, Once UI, and Supabase.',
-                        'tags': ['JavaScript', 'Next.js', 'Supabase'],
-                        'images': [
-                            {
-                                'src': 'images/projects/project-01/cover-04.jpg',
-                                'alt': 'Application preview',
-                            },
-                        ],
-                    },
-                ],
+                'categories': skill_categories or fallback_skill_categories,
             },
         }
 
@@ -240,6 +374,7 @@ def profile_detail_api(request):
             'state': '',
             'country': '',
             'profile_picture': None,
+            'resume': None,
             'is_active': False,
         })
 
@@ -253,6 +388,7 @@ def profile_detail_api(request):
         'state': profile.state,
         'country': profile.country,
         'profile_picture': profile.profile_picture.url if profile.profile_picture else None,
+        'resume': profile.resume.url if profile.resume else None,
         'is_active': profile.is_active,
         'created_at': profile.created_at.isoformat(),
         'updated_at': profile.updated_at.isoformat(),

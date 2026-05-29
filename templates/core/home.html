@@ -49,6 +49,14 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+
+                    {% if person.resume %}
+                    <a class="schedule-pill" href="{{ person.resume }}" download>
+                        <i class="bi bi-download"></i>
+                        <span>Download resume</span>
+                        <i class="bi bi-chevron-right schedule-arrow"></i>
+                    </a>
+                    {% endif %}
                 </section>
 
                 <section id="about" class="section-block reveal">
@@ -58,23 +66,65 @@
 
                 <section id="skills" class="section-block reveal">
                     <h2>{{ about.technical.title }}</h2>
-                    {% for skill in about.technical.skills %}
-                    <article class="skill-item">
-                        <h3 id="{{ skill.title|slugify }}">{{ skill.title }}</h3>
-                        <p>{{ skill.description }}</p>
-                        <div class="tag-list">
-                            {% for tag in skill.tags %}
-                            <span>{{ tag }}</span>
-                            {% endfor %}
-                        </div>
+                    <div class="skill-category-list">
+                        {% for category in about.technical.categories %}
+                        <article class="skill-item">
+                            <h3 id="{{ category.name|slugify }}">{{ category.name }}</h3>
+                            <div class="skill-logo-grid">
+                                {% for skill in category.skills %}
+                                <div class="skill-logo-card" title="{{ skill.name }}">
+                                    <span class="skill-logo-fallback">{{ skill.initial }}</span>
+                                    <img
+                                        src="{{ skill.logo }}"
+                                        alt="{{ skill.name }} logo"
+                                        loading="lazy"
+                                        onerror="this.style.display='none'; this.previousElementSibling.style.display='inline-flex';"
+                                    >
+                                    <span>{{ skill.name }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </article>
+                        {% empty %}
+                        <div class="empty-state">Skills are not added yet.</div>
+                        {% endfor %}
+                    </div>
+                </section>
 
-                        {% if skill.images %}
-                        <div class="skill-gallery">
-                            {% for image in skill.images %}
-                            <img src="{% static image.src %}" alt="{{ image.alt }}">
+                <section id="experience" class="section-block reveal">
+                    <h2>{{ about.work.title }}</h2>
+                    {% for company in about.work.companies %}
+                    <article class="timeline-item company-experience">
+                        <div class="timeline-heading">
+                            <div class="company-heading">
+                                {% if company.logo %}
+                                <img src="{{ company.logo }}" alt="{{ company.company }} logo">
+                                {% endif %}
+                                <h3 id="{{ company.company|slugify }}">{{ company.company }}</h3>
+                            </div>
+                        </div>
+                        <div class="company-role-list">
+                            {% for role in company.roles %}
+                            <div class="experience-role-item">
+                                <div class="role-heading">
+                                    <p class="accent-text">{{ role.role }}</p>
+                                    <span>{{ role.timeframe }}</span>
+                                </div>
+                                {% if role.preview %}
+                                <p class="experience-preview">{{ role.preview }}</p>
+                                {% endif %}
+                                <button
+                                    class="view-more-button"
+                                    type="button"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#experienceModal{{ forloop.parentloop.counter }}{{ forloop.counter }}"
+                                >
+                                    <span>View more</span>
+                                    <i class="bi bi-arrow-up-right"></i>
+                                </button>
+                            </div>
                             {% endfor %}
                         </div>
-                        {% endif %}
                     </article>
                     {% endfor %}
                 </section>
@@ -99,28 +149,12 @@
                     </div>
                 </section>
 
-                <section id="experience" class="section-block reveal">
-                    <h2>{{ about.work.title }}</h2>
-                    {% for experience in about.work.experiences %}
-                    <article class="timeline-item">
-                        <div class="timeline-heading">
-                            <h3 id="{{ experience.company|slugify }}">{{ experience.company }}</h3>
-                            <span>{{ experience.timeframe }}</span>
-                        </div>
-                        <p class="accent-text">{{ experience.role }}</p>
-                        <ul>
-                            {% for achievement in experience.achievements %}
-                            <li>{{ achievement }}</li>
-                            {% endfor %}
-                        </ul>
-
-                        {% if experience.images %}
-                        <div class="media-row">
-                            {% for image in experience.images %}
-                            <img src="{% static image.src %}" alt="{{ image.alt }}">
-                            {% endfor %}
-                        </div>
-                        {% endif %}
+                <section id="education" class="section-block reveal">
+                    <h2>{{ about.studies.title }}</h2>
+                    {% for institution in about.studies.institutions %}
+                    <article class="compact-item">
+                        <h3 id="{{ institution.name|slugify }}">{{ institution.name }}</h3>
+                        <p>{{ institution.description }}</p>
                     </article>
                     {% endfor %}
                 </section>
@@ -155,4 +189,47 @@
         </div>
     </div>
 </section>
+
+{% for company in about.work.companies %}
+{% for role in company.roles %}
+<div
+    class="modal fade experience-modal"
+    id="experienceModal{{ forloop.parentloop.counter }}{{ forloop.counter }}"
+    tabindex="-1"
+    aria-labelledby="experienceModalLabel{{ forloop.parentloop.counter }}{{ forloop.counter }}"
+    aria-hidden="true"
+>
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="experience-modal-title">
+                    {% if company.logo %}
+                    <img src="{{ company.logo }}" alt="{{ company.company }} logo">
+                    {% endif %}
+                    <div>
+                        <h3 id="experienceModalLabel{{ forloop.parentloop.counter }}{{ forloop.counter }}">{{ company.company }}</h3>
+                        <p>{{ role.role }}</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <span class="experience-duration">{{ role.timeframe }}</span>
+                {% if role.bullet_points %}
+                <ul class="experience-details-list">
+                    {% for point in role.bullet_points %}
+                    <li>{{ point }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                    {% for paragraph in role.paragraphs %}
+                    <p>{{ paragraph }}</p>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endfor %}
 {% endblock %}
