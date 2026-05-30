@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
 from ckeditor_uploader.fields import RichTextUploadingField
 
@@ -86,7 +87,9 @@ class ContactSubmission(CommonModel):
     message = models.TextField()
     owner_email_sent = models.BooleanField(default=False)
     confirmation_email_sent = models.BooleanField(default=False)
+    telegram_notification_sent = models.BooleanField(default=False)
     email_error = models.TextField(blank=True)
+    telegram_error = models.TextField(blank=True)
     is_read = models.BooleanField(default=False)
 
     class Meta:
@@ -96,6 +99,61 @@ class ContactSubmission(CommonModel):
 
     def __str__(self):
         return f'{self.name} - {self.subject or "Contact message"}'
+
+
+class NotificationSetting(CommonModel):
+    class NotificationType(models.TextChoices):
+        SITE = 'site', 'Site Notification'
+        CONTACT_US = 'contact_us', 'Contact Us Notification'
+        SITE_VISIT = 'site_visit', 'Site Visit Notification'
+
+    notification_type = models.CharField(
+        max_length=30,
+        choices=NotificationType.choices,
+        unique=True,
+    )
+    email_notification = models.BooleanField(default=False)
+    telegram_notification = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Notification Setting'
+        verbose_name_plural = 'Notification Settings'
+        ordering = ['notification_type']
+
+    def __str__(self):
+        return self.get_notification_type_display()
+
+
+class UserSiteVisit(CommonModel):
+    ip_address = models.GenericIPAddressField()
+    browser_name = models.CharField(max_length=80)
+    browser_version = models.CharField(max_length=80, blank=True)
+    operating_system = models.CharField(max_length=120, blank=True)
+    device_type = models.CharField(max_length=40, blank=True)
+    user_agent = models.TextField(blank=True)
+    referrer_url = models.URLField(max_length=500, blank=True)
+    country = models.CharField(max_length=120, blank=True)
+    state = models.CharField(max_length=120, blank=True)
+    city = models.CharField(max_length=120, blank=True)
+    visit_count = models.PositiveIntegerField(default=1)
+    total_duration_seconds = models.PositiveIntegerField(default=0)
+    first_visited_at = models.DateTimeField(default=timezone.now)
+    last_visited_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = 'User Site Visit'
+        verbose_name_plural = 'User Site Visits'
+        ordering = ['-last_visited_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ip_address', 'browser_name'],
+                name='unique_visit_ip_browser',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.ip_address} - {self.browser_name}'
 
 
 class DynamicTemplate(CommonModel):

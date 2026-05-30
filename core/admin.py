@@ -6,6 +6,7 @@ from .models import (
     DynamicTemplate,
     Education,
     ExperienceRole,
+    NotificationSetting,
     ProfileDetail,
     Project,
     ProjectScreenshot,
@@ -13,6 +14,7 @@ from .models import (
     Skill,
     SkillCategory,
     SocialLink,
+    UserSiteVisit,
 )
 
 
@@ -74,10 +76,17 @@ class ContactSubmissionAdmin(admin.ModelAdmin):
         'subject',
         'owner_email_sent',
         'confirmation_email_sent',
+        'telegram_notification_sent',
         'is_read',
         'created_at',
     )
-    list_filter = ('owner_email_sent', 'confirmation_email_sent', 'is_read', 'created_at')
+    list_filter = (
+        'owner_email_sent',
+        'confirmation_email_sent',
+        'telegram_notification_sent',
+        'is_read',
+        'created_at',
+    )
     search_fields = ('name', 'email', 'phone_number', 'subject', 'message')
     readonly_fields = (
         'name',
@@ -87,7 +96,9 @@ class ContactSubmissionAdmin(admin.ModelAdmin):
         'message',
         'owner_email_sent',
         'confirmation_email_sent',
+        'telegram_notification_sent',
         'email_error',
+        'telegram_error',
         'created_at',
         'updated_at',
     )
@@ -98,10 +109,131 @@ class ContactSubmissionAdmin(admin.ModelAdmin):
         ('Email Status', {
             'fields': ('owner_email_sent', 'confirmation_email_sent', 'email_error')
         }),
+        ('Telegram Status', {
+            'fields': ('telegram_notification_sent', 'telegram_error')
+        }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
         }),
     )
+
+
+@admin.register(NotificationSetting)
+class NotificationSettingAdmin(admin.ModelAdmin):
+    list_display = (
+        'notification_type',
+        'email_notification',
+        'telegram_notification',
+        'is_active',
+        'updated_at',
+    )
+    list_filter = ('email_notification', 'telegram_notification', 'is_active', 'created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Notification', {
+            'fields': (
+                'notification_type',
+                'email_notification',
+                'telegram_notification',
+                'is_active',
+            )
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+
+@admin.register(UserSiteVisit)
+class UserSiteVisitAdmin(admin.ModelAdmin):
+    list_display = (
+        'ip_address',
+        'browser_name',
+        'city',
+        'state',
+        'country',
+        'operating_system',
+        'device_type',
+        'visit_count',
+        'duration_display',
+        'first_visited_at',
+        'last_visited_at',
+    )
+    list_filter = (
+        'browser_name',
+        'country',
+        'state',
+        'city',
+        'operating_system',
+        'device_type',
+        'created_at',
+        'first_visited_at',
+        'last_visited_at',
+    )
+    search_fields = (
+        'ip_address',
+        'browser_name',
+        'browser_version',
+        'operating_system',
+        'country',
+        'state',
+        'city',
+        'user_agent',
+        'referrer_url',
+    )
+    readonly_fields = (
+        'ip_address',
+        'browser_name',
+        'browser_version',
+        'operating_system',
+        'device_type',
+        'user_agent',
+        'referrer_url',
+        'country',
+        'state',
+        'city',
+        'visit_count',
+        'total_duration_seconds',
+        'first_visited_at',
+        'last_visited_at',
+        'created_at',
+        'updated_at',
+    )
+    fieldsets = (
+        ('Visitor', {
+            'fields': (
+                'ip_address',
+                'browser_name',
+                'browser_version',
+                'operating_system',
+                'device_type',
+                'user_agent',
+                'referrer_url',
+                'country',
+                'state',
+                'city',
+            )
+        }),
+        ('Visit Stats', {
+            'fields': ('visit_count', 'total_duration_seconds', 'first_visited_at', 'last_visited_at')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+    @admin.display(description='Duration')
+    def duration_display(self, obj):
+        minutes, seconds = divmod(obj.total_duration_seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+
+        if hours:
+            return f'{hours}h {minutes}m {seconds}s'
+
+        if minutes:
+            return f'{minutes}m {seconds}s'
+
+        return f'{seconds}s'
 
 
 @admin.register(DynamicTemplate)

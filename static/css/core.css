@@ -331,6 +331,10 @@ a {
     transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
+.resume-download-pill {
+    padding: 0.45rem 1rem;
+}
+
 .schedule-pill:hover {
     transform: translateY(-1px);
     border-color: var(--brand);

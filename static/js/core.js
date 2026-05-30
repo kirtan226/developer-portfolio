@@ -97,6 +97,64 @@
             });
         });
 
+    const siteVisitTracker = document.querySelector("[data-site-visit-id][data-site-visit-duration-url]");
+
+    function getCsrfToken() {
+        const csrfInput = document.querySelector("[name='csrfmiddlewaretoken']");
+        return csrfInput ? csrfInput.value : "";
+    }
+
+    function startSiteVisitDurationTracking() {
+        if (!siteVisitTracker) {
+            return;
+        }
+
+        const siteVisitId = siteVisitTracker.dataset.siteVisitId;
+        const durationUrl = siteVisitTracker.dataset.siteVisitDurationUrl;
+        let lastSentAt = Date.now();
+
+        function sendDuration() {
+            const now = Date.now();
+            const durationSeconds = Math.floor((now - lastSentAt) / 1000);
+
+            if (durationSeconds <= 0) {
+                return;
+            }
+
+            lastSentAt = now;
+
+            const formData = new FormData();
+            formData.append("site_visit_id", siteVisitId);
+            formData.append("duration_seconds", String(durationSeconds));
+            formData.append("csrfmiddlewaretoken", getCsrfToken());
+
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(durationUrl, formData);
+                return;
+            }
+
+            fetch(durationUrl, {
+                method: "POST",
+                body: formData,
+                keepalive: true,
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json",
+                },
+            }).catch(function () {});
+        }
+
+        window.setInterval(sendDuration, 15000);
+        document.addEventListener("visibilitychange", function () {
+            if (document.visibilityState === "hidden") {
+                sendDuration();
+            }
+        });
+        window.addEventListener("pagehide", sendDuration);
+    }
+
+    startSiteVisitDurationTracking();
+
     const contactForm = document.querySelector(".contact-form");
     const contactStatus = document.querySelector("[data-contact-status]");
 
@@ -156,6 +214,52 @@
         });
     }
 
+    function clearContactFieldError(form, name) {
+        const errorNode = form.querySelector("[data-error-for='" + name + "']");
+        const field = form.elements[name];
+
+        if (errorNode) {
+            errorNode.textContent = "";
+        }
+
+        if (field) {
+            field.classList.remove("is-invalid");
+        }
+    }
+
+    function showContactFieldError(form, name, message) {
+        const errorNode = form.querySelector("[data-error-for='" + name + "']");
+        const field = form.elements[name];
+
+        if (errorNode) {
+            errorNode.textContent = message;
+        }
+
+        if (field) {
+            field.classList.toggle("is-invalid", Boolean(message));
+        }
+    }
+
+    function validateEmailFieldOnInput(form) {
+        const field = form.elements.email;
+
+        if (!field) {
+            return;
+        }
+
+        const value = field.value.trim();
+
+        if (!value) {
+            clearContactFieldError(form, "email");
+        } else if (value.length > 35) {
+            showContactFieldError(form, "email", "Email should be 35 characters or less.");
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+            showContactFieldError(form, "email", "Please enter a valid email.");
+        } else {
+            clearContactFieldError(form, "email");
+        }
+    }
+
     function showContactStatus(type, message, autoHide) {
         if (!contactStatus) {
             return;
@@ -194,10 +298,17 @@
             }
 
             field.addEventListener("input", function () {
-                const errors = validateContactForm(contactForm);
-                showContactFieldErrors(contactForm, errors);
+                if (name === "email") {
+                    validateEmailFieldOnInput(contactForm);
+                } else {
+                    clearContactFieldError(contactForm, name);
+                }
 
-                if (!Object.keys(errors).length && contactStatus && contactStatus.classList.contains("contact-status-error")) {
+                const hasVisibleErrors = Array.from(contactForm.querySelectorAll("[data-error-for]")).some(function (node) {
+                    return Boolean(node.textContent.trim());
+                });
+
+                if (!hasVisibleErrors && contactStatus && contactStatus.classList.contains("contact-status-error")) {
                     contactStatus.className = "contact-status d-none";
                     contactStatus.textContent = "";
                 }

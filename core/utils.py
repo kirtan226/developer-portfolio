@@ -1,19 +1,40 @@
+import ipaddress
+import json
+import re
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.db.models import F
 from django.db.utils import DatabaseError, OperationalError, ProgrammingError
 from django.template import Context, Template
+from django.utils import timezone
 from django.utils.html import escape, strip_tags
 
-from .models import DynamicTemplate
+from .models import DynamicTemplate, NotificationSetting, UserSiteVisit
 
 
 OWNER_CONTACT_TEMPLATE_SLUG = 'contact-owner-notification'
 VISITOR_CONFIRMATION_TEMPLATE_SLUG = 'contact-visitor-confirmation'
+TELEGRAM_TIMEOUT_SECONDS = 10
+TRACKED_DURATION_MAX_SECONDS = 3600
+IP_LOCATION_TIMEOUT_SECONDS = 3
 
 
 def get_dynamic_template(slug):
     try:
         return DynamicTemplate.objects.filter(slug=slug, is_active=True).first()
+    except (DatabaseError, OperationalError, ProgrammingError):
+        return None
+
+
+def get_notification_setting(notification_type):
+    try:
+        return NotificationSetting.objects.filter(
+            notification_type=notification_type,
+            is_active=True,
+        ).first()
     except (DatabaseError, OperationalError, ProgrammingError):
         return None
 
@@ -72,7 +93,285 @@ def send_html_email(subject, to_email, html_body):
     return True
 
 
-def send_contact_emails(contact_submission, profile):
+def get_client_ip(request):
+    forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
+
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+
+    return request.META.get('REMOTE_ADDR', '')
+
+
+def parse_browser_details(user_agent):
+    details = {
+        'browser_name': 'Unknown',
+        'browser_version': '',
+        'operating_system': 'Unknown',
+        'device_type': 'Desktop',
+    }
+
+    browser_patterns = [
+        ('Edge', r'Edg/([\d.]+)'),
+        ('Chrome', r'Chrome/([\d.]+)'),
+        ('Firefox', r'Firefox/([\d.]+)'),
+        ('Safari', r'Version/([\d.]+).*Safari'),
+        ('Opera', r'OPR/([\d.]+)'),
+    ]
+
+    for browser_name, pattern in browser_patterns:
+        match = re.search(pattern, user_agent)
+        if match:
+            details['browser_name'] = browser_name
+            details['browser_version'] = match.group(1)
+            break
+
+    if 'Windows' in user_agent:
+        details['operating_system'] = 'Windows'
+    elif 'Android' in user_agent:
+        details['operating_system'] = 'Android'
+    elif 'iPhone' in user_agent or 'iPad' in user_agent:
+        details['operating_system'] = 'iOS'
+    elif 'Mac OS X' in user_agent:
+        details['operating_system'] = 'macOS'
+    elif 'Linux' in user_agent:
+        details['operating_system'] = 'Linux'
+
+    if 'Mobi' in user_agent or 'Android' in user_agent or 'iPhone' in user_agent:
+        details['device_type'] = 'Mobile'
+    elif 'iPad' in user_agent or 'Tablet' in user_agent:
+        details['device_type'] = 'Tablet'
+
+    return details
+
+
+def get_ip_location(ip_address):
+    try:
+        ip = ipaddress.ip_address(ip_address)
+    except ValueError:
+        return {
+            'country': '',
+            'state': '',
+            'city': '',
+        }
+
+    if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
+        return {
+            'country': '',
+            'state': '',
+            'city': '',
+        }
+
+    url = f'https://ipapi.co/{ip_address}/json/'
+
+    try:
+        with urlopen(url, timeout=IP_LOCATION_TIMEOUT_SECONDS) as response:
+            response_body = response.read().decode('utf-8')
+
+        result = json.loads(response_body)
+    except Exception:
+        return {
+            'country': '',
+            'state': '',
+            'city': '',
+        }
+
+    return {
+        'country': result.get('country_name', '') or '',
+        'state': result.get('region', '') or '',
+        'city': result.get('city', '') or '',
+    }
+
+
+def record_site_visit(request):
+    ip_address = get_client_ip(request)
+    user_agent = request.META.get('HTTP_USER_AGENT', '')
+    referrer_url = request.META.get('HTTP_REFERER', '')
+    browser_details = parse_browser_details(user_agent)
+    location = get_ip_location(ip_address)
+    now = timezone.now()
+
+    site_visit, created = UserSiteVisit.objects.get_or_create(
+        ip_address=ip_address,
+        browser_name=browser_details['browser_name'],
+        defaults={
+            'browser_version': browser_details['browser_version'],
+            'operating_system': browser_details['operating_system'],
+            'device_type': browser_details['device_type'],
+            'user_agent': user_agent,
+            'referrer_url': referrer_url[:500],
+            'country': location['country'],
+            'state': location['state'],
+            'city': location['city'],
+            'first_visited_at': now,
+            'last_visited_at': now,
+        },
+    )
+
+    if not created:
+        site_visit.browser_version = browser_details['browser_version']
+        site_visit.operating_system = browser_details['operating_system']
+        site_visit.device_type = browser_details['device_type']
+        site_visit.user_agent = user_agent
+        if referrer_url:
+            site_visit.referrer_url = referrer_url[:500]
+        if location['country'] or location['state'] or location['city']:
+            site_visit.country = location['country']
+            site_visit.state = location['state']
+            site_visit.city = location['city']
+        site_visit.visit_count = F('visit_count') + 1
+        site_visit.last_visited_at = now
+        site_visit.save(update_fields=[
+            'browser_version',
+            'operating_system',
+            'device_type',
+            'user_agent',
+            'referrer_url',
+            'country',
+            'state',
+            'city',
+            'visit_count',
+            'last_visited_at',
+            'updated_at',
+        ])
+        site_visit.refresh_from_db()
+
+    return site_visit, created
+
+
+def add_site_visit_duration(site_visit_id, duration_seconds):
+    try:
+        duration_seconds = int(duration_seconds)
+    except (TypeError, ValueError):
+        return False
+
+    if duration_seconds <= 0:
+        return False
+
+    duration_seconds = min(duration_seconds, TRACKED_DURATION_MAX_SECONDS)
+
+    return UserSiteVisit.objects.filter(id=site_visit_id).update(
+        total_duration_seconds=F('total_duration_seconds') + duration_seconds,
+        updated_at=timezone.now(),
+    ) > 0
+
+
+def format_duration(seconds):
+    minutes, seconds = divmod(int(seconds or 0), 60)
+    hours, minutes = divmod(minutes, 60)
+
+    if hours:
+        return f'{hours}h {minutes}m {seconds}s'
+
+    if minutes:
+        return f'{minutes}m {seconds}s'
+
+    return f'{seconds}s'
+
+
+def send_telegram_notification(message):
+    bot_token = settings.TELEGRAM_BOT_TOKEN
+    chat_id = settings.TELEGRAM_CHAT_ID
+
+    if not bot_token or not chat_id:
+        return False
+
+    url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
+    payload = urlencode({
+        'chat_id': chat_id,
+        'text': message,
+        'parse_mode': 'HTML',
+        'disable_web_page_preview': 'true',
+    }).encode('utf-8')
+    request = Request(url, data=payload, method='POST')
+
+    with urlopen(request, timeout=TELEGRAM_TIMEOUT_SECONDS) as response:
+        response_body = response.read().decode('utf-8')
+
+    result = json.loads(response_body)
+    if not result.get('ok'):
+        description = result.get('description', 'Telegram API returned an error.')
+        raise RuntimeError(description)
+
+    return True
+
+
+def build_contact_telegram_message(contact_submission):
+    created_at = timezone.localtime(contact_submission.created_at).strftime('%d %b %Y, %I:%M %p')
+    lines = [
+        '🔔 <b>New Contact Message</b>',
+        '',
+        f'👤 <b>Name:</b> {escape(contact_submission.name)}',
+        f'📧 <b>Email:</b> {escape(contact_submission.email)}',
+        f'📝 <b>Subject:</b> {escape(contact_submission.subject)}',
+    ]
+
+    if contact_submission.phone_number:
+        lines.append(f'📱 <b>Phone:</b> {escape(contact_submission.phone_number)}')
+
+    lines.extend([
+        '',
+        '💬 <b>Message</b>',
+        escape(contact_submission.message),
+        '',
+        f'🕒 <b>Submitted:</b> {escape(created_at)}',
+    ])
+    return '\n'.join(lines)
+
+
+def build_site_visit_telegram_message(site_visit, is_new_visit):
+    visited_at = timezone.localtime(site_visit.last_visited_at).strftime('%d %b %Y, %I:%M %p')
+    first_visited_at = timezone.localtime(site_visit.first_visited_at).strftime('%d %b %Y, %I:%M %p')
+    status = 'New Visitor' if is_new_visit else 'Returning Visitor'
+    lines = [
+        f'👁️ <b>{escape(status)}</b>',
+        '',
+        f'🌐 <b>IP:</b> {escape(site_visit.ip_address)}',
+        f'📍 <b>Country:</b> {escape(site_visit.country or "Not available")}',
+        f'🏙️ <b>State:</b> {escape(site_visit.state or "Not available")}',
+        f'🏢 <b>City:</b> {escape(site_visit.city or "Not available")}',
+        f'🧭 <b>Browser:</b> {escape(site_visit.browser_name)} {escape(site_visit.browser_version)}'.strip(),
+        f'💻 <b>OS:</b> {escape(site_visit.operating_system)}',
+        f'📱 <b>Device:</b> {escape(site_visit.device_type)}',
+        f'🔢 <b>Visit Count:</b> {site_visit.visit_count}',
+        f'⏱️ <b>Total Time:</b> {escape(format_duration(site_visit.total_duration_seconds))}',
+        f'🕒 <b>First Visit:</b> {escape(first_visited_at)}',
+        f'🔁 <b>Last Visit:</b> {escape(visited_at)}',
+    ]
+
+    if site_visit.referrer_url:
+        lines.extend([
+            '',
+            f'↩️ <b>Referrer:</b> {escape(site_visit.referrer_url)}',
+        ])
+
+    return '\n'.join(lines)
+
+
+def build_site_visit_email(site_visit, is_new_visit):
+    status = 'New visitor' if is_new_visit else 'Returning visitor'
+    visited_at = timezone.localtime(site_visit.last_visited_at).strftime('%d %b %Y, %I:%M %p')
+    first_visited_at = timezone.localtime(site_visit.first_visited_at).strftime('%d %b %Y, %I:%M %p')
+    subject = f'{status} on your portfolio'
+    body = f"""
+<p><strong>{escape(status)}</strong> visited your site.</p>
+<p><strong>IP:</strong> {escape(site_visit.ip_address)}<br>
+<strong>Country:</strong> {escape(site_visit.country or 'Not available')}<br>
+<strong>State:</strong> {escape(site_visit.state or 'Not available')}<br>
+<strong>City:</strong> {escape(site_visit.city or 'Not available')}<br>
+<strong>Browser:</strong> {escape(site_visit.browser_name)} {escape(site_visit.browser_version)}<br>
+<strong>OS:</strong> {escape(site_visit.operating_system)}<br>
+<strong>Device:</strong> {escape(site_visit.device_type)}<br>
+<strong>Visit count:</strong> {site_visit.visit_count}<br>
+<strong>Total time:</strong> {escape(format_duration(site_visit.total_duration_seconds))}<br>
+<strong>First visit:</strong> {escape(first_visited_at)}<br>
+<strong>Last visit:</strong> {escape(visited_at)}</p>
+<p><strong>Referrer:</strong> {escape(site_visit.referrer_url or 'Direct visit')}</p>
+<p><strong>User agent:</strong><br>{escape(site_visit.user_agent)}</p>
+"""
+    return subject, wrap_email_html('Site Visit Notification', body)
+
+
+def build_contact_email_bodies(contact_submission, profile):
     context_data = build_contact_email_context(contact_submission, profile)
     owner_subject = f'New contact message: {context_data["contact_subject"]}'
     visitor_subject = f'Thank you for reaching out to {context_data["site_name"]}'
@@ -100,7 +399,95 @@ def send_contact_emails(contact_submission, profile):
         'Thank You For Reaching Out',
         render_template_content(VISITOR_CONFIRMATION_TEMPLATE_SLUG, context_data, visitor_fallback),
     )
+    return owner_subject, owner_html, visitor_subject, visitor_html
 
+
+def send_contact_owner_email(contact_submission, profile):
+    owner_subject, owner_html, _, _ = build_contact_email_bodies(contact_submission, profile)
+    return send_html_email(owner_subject, profile.email if profile else '', owner_html)
+
+
+def send_contact_confirmation_email(contact_submission, profile):
+    _, _, visitor_subject, visitor_html = build_contact_email_bodies(contact_submission, profile)
+    return send_html_email(visitor_subject, contact_submission.email, visitor_html)
+
+
+def send_contact_telegram_notification(contact_submission):
+    return send_telegram_notification(build_contact_telegram_message(contact_submission))
+
+
+def send_contact_notifications(contact_submission, profile):
+    notification_setting = get_notification_setting(NotificationSetting.NotificationType.CONTACT_US)
+    owner_sent = False
+    telegram_sent = False
+    email_error = ''
+    telegram_error = ''
+
+    if notification_setting and notification_setting.email_notification:
+        try:
+            owner_sent = send_contact_owner_email(contact_submission, profile)
+            if not owner_sent:
+                email_error = 'Profile email is not configured.'
+        except Exception as exc:
+            email_error = str(exc)
+
+    if notification_setting and notification_setting.telegram_notification:
+        try:
+            telegram_sent = send_contact_telegram_notification(contact_submission)
+            if not telegram_sent:
+                telegram_error = 'Telegram bot token or chat ID is not configured.'
+        except Exception as exc:
+            telegram_error = str(exc)
+
+    confirmation_sent = send_contact_confirmation_email(contact_submission, profile)
+
+    return {
+        'owner_email_sent': owner_sent,
+        'confirmation_email_sent': confirmation_sent,
+        'telegram_notification_sent': telegram_sent,
+        'email_error': email_error,
+        'telegram_error': telegram_error,
+        'email_enabled': bool(notification_setting and notification_setting.email_notification),
+        'telegram_enabled': bool(notification_setting and notification_setting.telegram_notification),
+    }
+
+
+def send_site_visit_notifications(site_visit, profile, is_new_visit):
+    notification_setting = get_notification_setting(NotificationSetting.NotificationType.SITE_VISIT)
+    result = {
+        'email_sent': False,
+        'telegram_sent': False,
+        'email_error': '',
+        'telegram_error': '',
+    }
+
+    if notification_setting and notification_setting.email_notification:
+        try:
+            subject, html_body = build_site_visit_email(site_visit, is_new_visit)
+            result['email_sent'] = send_html_email(subject, profile.email if profile else '', html_body)
+            if not result['email_sent']:
+                result['email_error'] = 'Profile email is not configured.'
+        except Exception as exc:
+            result['email_error'] = str(exc)
+
+    if notification_setting and notification_setting.telegram_notification:
+        try:
+            result['telegram_sent'] = send_telegram_notification(
+                build_site_visit_telegram_message(site_visit, is_new_visit),
+            )
+            if not result['telegram_sent']:
+                result['telegram_error'] = 'Telegram bot token or chat ID is not configured.'
+        except Exception as exc:
+            result['telegram_error'] = str(exc)
+
+    return result
+
+
+def send_contact_emails(contact_submission, profile):
+    owner_subject, owner_html, visitor_subject, visitor_html = build_contact_email_bodies(
+        contact_submission,
+        profile,
+    )
     owner_sent = send_html_email(owner_subject, profile.email if profile else '', owner_html)
     confirmation_sent = send_html_email(visitor_subject, contact_submission.email, visitor_html)
     return owner_sent, confirmation_sent

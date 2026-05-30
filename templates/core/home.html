@@ -4,7 +4,14 @@
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<section id="home" class="portfolio-shell container-fluid">
+<section
+    id="home"
+    class="portfolio-shell container-fluid"
+    {% if site_visit %}
+    data-site-visit-id="{{ site_visit.id }}"
+    data-site-visit-duration-url="{% url 'site_visit_duration_api' %}"
+    {% endif %}
+>
     <div class="row justify-content-center gx-5 portfolio-layout">
         <div class="col-12 col-lg-4 col-xl-3 profile-column">
             <div class="identity-panel">
@@ -51,10 +58,12 @@
                     {% endif %}
 
                     {% if person.resume %}
-                    <a class="schedule-pill" href="{{ person.resume }}" download>
+                    <a class="schedule-pill resume-download-pill" href="{{ person.resume }}" download>
                         <i class="bi bi-download"></i>
                         <span>Download resume</span>
+                        {% comment %}
                         <i class="bi bi-chevron-right schedule-arrow"></i>
+                        {% endcomment %}
                     </a>
                     {% endif %}
                 </section>

@@ -21,7 +21,12 @@ from .models import (
     SkillCategory,
     SocialLink,
 )
-from .utils import send_contact_emails
+from .utils import (
+    add_site_visit_duration,
+    record_site_visit,
+    send_contact_notifications,
+    send_site_visit_notifications,
+)
 
 
 NOT_ADDED = 'Not Added'
@@ -29,6 +34,7 @@ PROJECT_FALLBACK_IMAGE = 'images/projects/project-01/PROJECT_COVER_IMAGE.jpg'
 CONTACT_FIELD_LIMITS = {
     'name': 24,
     'email': 35,
+    'phone_number': 30,
     'subject': 55,
     'message': 355,
 }
@@ -394,6 +400,7 @@ def validate_contact_form_data(contact_form):
     length_messages = {
         'name': 'Name should be 24 characters or less.',
         'email': 'Email should be 35 characters or less.',
+        'phone_number': 'Phone number should be 30 characters or less.',
         'subject': 'Subject should be 55 characters or less.',
         'message': 'Message should be 355 characters or less.',
     }
@@ -407,6 +414,10 @@ def validate_contact_form_data(contact_form):
 
         if len(value) > CONTACT_FIELD_LIMITS[field]:
             errors[field] = length_messages[field]
+
+    phone_number = contact_form.get('phone_number', '')
+    if phone_number and len(phone_number) > CONTACT_FIELD_LIMITS['phone_number']:
+        errors['phone_number'] = length_messages['phone_number']
 
     if contact_form.get('email') and 'email' not in errors:
         try:
@@ -604,7 +615,17 @@ class HomeView(View):
         return context
 
     def get(self, request, *args, **kwargs):
-        return render(request, self.template_name, self.build_context())
+        site_visit = None
+
+        try:
+            site_visit, is_new_visit = record_site_visit(request)
+            send_site_visit_notifications(site_visit, get_active_profile(), is_new_visit)
+        except (DatabaseError, OperationalError, ProgrammingError):
+            site_visit = None
+
+        context = self.build_context()
+        context['site_visit'] = site_visit
+        return render(request, self.template_name, context)
 
 
 @require_POST
@@ -612,6 +633,7 @@ def contact_submit_api(request):
     contact_form = {
         'name': request.POST.get('name', '').strip(),
         'email': request.POST.get('email', '').strip(),
+        'phone_number': request.POST.get('phone_number', '').strip(),
         'subject': request.POST.get('subject', '').strip(),
         'message': request.POST.get('message', '').strip(),
     }
@@ -628,23 +650,25 @@ def contact_submit_api(request):
     profile = get_active_profile()
 
     try:
-        owner_sent, confirmation_sent = send_contact_emails(contact_submission, profile)
-        contact_submission.owner_email_sent = owner_sent
-        contact_submission.confirmation_email_sent = confirmation_sent
-
-        if not owner_sent:
-            contact_submission.email_error = 'Profile email is not configured.'
+        notification_result = send_contact_notifications(contact_submission, profile)
+        contact_submission.owner_email_sent = notification_result['owner_email_sent']
+        contact_submission.confirmation_email_sent = notification_result['confirmation_email_sent']
+        contact_submission.telegram_notification_sent = notification_result['telegram_notification_sent']
+        contact_submission.email_error = notification_result['email_error']
+        contact_submission.telegram_error = notification_result['telegram_error']
 
         contact_submission.save(update_fields=[
             'owner_email_sent',
             'confirmation_email_sent',
+            'telegram_notification_sent',
             'email_error',
+            'telegram_error',
             'updated_at',
         ])
         status_message = 'Your message has been sent.'
 
-        if not owner_sent:
-            status_message = 'Your message was saved, but owner email is not configured.'
+        if notification_result['email_error'] or notification_result['telegram_error']:
+            status_message = 'Your message was saved, but one or more owner alerts failed.'
 
         return JsonResponse({
             'ok': True,
@@ -659,6 +683,17 @@ def contact_submit_api(request):
             'message': f'Your message was saved, but email delivery failed: {error_message}',
             'errors': {},
         }, status=500)
+
+
+@require_POST
+def site_visit_duration_api(request):
+    site_visit_id = request.POST.get('site_visit_id')
+    duration_seconds = request.POST.get('duration_seconds')
+    updated = add_site_visit_duration(site_visit_id, duration_seconds)
+
+    return JsonResponse({
+        'ok': updated,
+    })
 
 
 def profile_detail_api(request):

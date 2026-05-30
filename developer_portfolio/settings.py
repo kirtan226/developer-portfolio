@@ -172,6 +172,11 @@ EMAIL_USE_SSL = False
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+# ==== Telegram configurations ====
+
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
+
 # ==== Celery =====
 
 CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
