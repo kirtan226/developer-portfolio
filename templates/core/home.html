@@ -134,53 +134,136 @@
                     <div class="project-grid">
                         {% for project in projects %}
                         <article class="project-card">
-                            <img src="{% static project.image %}" alt="{{ project.title }}">
-                            <div>
-                                <h3>{{ project.title }}</h3>
-                                <p>{{ project.description }}</p>
-                                <div class="tag-list">
-                                    {% for tag in project.tags %}
-                                    <span>{{ tag }}</span>
+                            {% if project.cover_image.is_static %}
+                            <img src="{% static project.cover_image.src %}" alt="{{ project.cover_image.alt }}">
+                            {% else %}
+                            <img src="{{ project.cover_image.src }}" alt="{{ project.cover_image.alt }}">
+                            {% endif %}
+                            <div class="project-card-body">
+                                <h3>{{ project.name }}</h3>
+                                {% if project.technology_preview %}
+                                <div class="project-technology-list project-technology-preview" aria-label="Technologies">
+                                    {% for technology in project.technology_preview %}
+                                    <span class="project-technology-pill" title="{{ technology.name }}">
+                                        <span class="skill-logo-fallback">{{ technology.initial }}</span>
+                                        <img
+                                            src="{{ technology.logo }}"
+                                            alt="{{ technology.name }} logo"
+                                            loading="lazy"
+                                            onerror="this.style.display='none'; this.previousElementSibling.style.display='inline-flex';"
+                                        >
+                                        <span>{{ technology.name }}</span>
+                                    </span>
                                     {% endfor %}
+                                    {% if project.has_more_technologies %}
+                                    <span class="project-technology-more" aria-label="More technologies">
+                                        <i class="bi bi-three-dots"></i>
+                                    </span>
+                                    {% endif %}
                                 </div>
+                                {% endif %}
+                                <button
+                                    class="view-more-button"
+                                    type="button"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#projectModal{{ forloop.counter }}"
+                                >
+                                    <span>View more</span>
+                                    <i class="bi bi-arrow-up-right"></i>
+                                </button>
                             </div>
                         </article>
+                        {% empty %}
+                        <div class="empty-state">Projects are not added yet.</div>
                         {% endfor %}
                     </div>
                 </section>
 
                 <section id="education" class="section-block reveal">
-                    <h2>{{ about.studies.title }}</h2>
-                    {% for institution in about.studies.institutions %}
-                    <article class="compact-item">
-                        <h3 id="{{ institution.name|slugify }}">{{ institution.name }}</h3>
-                        <p>{{ institution.description }}</p>
+                    <h2>{{ about.education.title }}</h2>
+                    {% for item in about.education.items %}
+                    <article class="compact-item education-item">
+                        <div class="education-heading">
+                            <div>
+                                <h3 id="{{ item.institution|slugify }}">{{ item.institution }}</h3>
+                                <p class="accent-text">{{ item.degree }}</p>
+                            </div>
+                            <span>{{ item.duration }}</span>
+                        </div>
+                        {% if item.details %}
+                        <div class="education-meta">
+                            {% for detail in item.details %}
+                            <span>{{ detail }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                     </article>
+                    {% empty %}
+                    <div class="empty-state">Education details are not added yet.</div>
                     {% endfor %}
                 </section>
 
                 <section id="contact" class="section-block reveal">
                     <h2>Contact</h2>
-                    <form class="contact-form" action="#" method="post">
+                    {% if person.email or person.phone_number %}
+                    <div class="contact-detail-list">
+                        {% if person.email %}
+                        <a class="contact-detail-item" href="mailto:{{ person.email }}">
+                            <i class="bi bi-envelope"></i>
+                            <span>{{ person.email }}</span>
+                        </a>
+                        {% endif %}
+                        {% if person.phone_number %}
+                        <a class="contact-detail-item" href="tel:{{ person.phone_number }}">
+                            <i class="bi bi-telephone"></i>
+                            <span>{{ person.phone_number }}</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <form class="contact-form" action="{% url 'contact_submit_api' %}" data-ajax-url="{% url 'contact_submit_api' %}" method="post" novalidate>
                         {% csrf_token %}
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="contact-name">Name</label>
-                                <input id="contact-name" name="name" type="text" placeholder="Your name" required>
+                                <input id="contact-name" name="name" type="text" value="{{ contact_form.name }}" placeholder="Your name" maxlength="24" required class="{% if contact_errors.name %}is-invalid{% endif %}">
+                                <span class="field-error" data-error-for="name">{{ contact_errors.name }}</span>
                             </div>
                             <div class="col-md-6">
                                 <label for="contact-email">Email</label>
-                                <input id="contact-email" name="email" type="email" placeholder="you@example.com" required>
+                                <input id="contact-email" name="email" type="email" value="{{ contact_form.email }}" placeholder="you@example.com" maxlength="35" required class="{% if contact_errors.email %}is-invalid{% endif %}">
+                                <span class="field-error" data-error-for="email">{{ contact_errors.email }}</span>
+                            </div>
+                            <div class="col-12">
+                                <label for="contact-subject">Subject</label>
+                                <input id="contact-subject" name="subject" type="text" value="{{ contact_form.subject }}" placeholder="Project inquiry" maxlength="55" required class="{% if contact_errors.subject %}is-invalid{% endif %}">
+                                <span class="field-error" data-error-for="subject">{{ contact_errors.subject }}</span>
                             </div>
                             <div class="col-12">
                                 <label for="contact-message">Message</label>
-                                <textarea id="contact-message" name="message" rows="5" placeholder="Tell me about your project" required></textarea>
+                                <textarea id="contact-message" name="message" rows="5" placeholder="Tell me about your project" maxlength="355" required class="{% if contact_errors.message %}is-invalid{% endif %}">{{ contact_form.message }}</textarea>
+                                <span class="field-error" data-error-for="message">{{ contact_errors.message }}</span>
                             </div>
                             <div class="col-12">
+                                <div class="contact-submit-row">
                                 <button class="submit-button" type="submit">
                                     <i class="bi bi-send"></i>
                                     <span>Send Message</span>
+                                    <span class="button-loader" aria-hidden="true">
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                    </span>
                                 </button>
+                                {% if contact_status %}
+                                <div class="contact-status contact-status-{{ contact_status.type }}" data-contact-status>
+                                    {{ contact_status.message }}
+                                </div>
+                                {% else %}
+                                <div class="contact-status d-none" data-contact-status></div>
+                                {% endif %}
+                                </div>
                             </div>
                         </div>
                     </form>
@@ -231,5 +314,98 @@
     </div>
 </div>
 {% endfor %}
+{% endfor %}
+
+{% for project in projects %}
+<div
+    class="modal fade experience-modal project-modal"
+    id="projectModal{{ forloop.counter }}"
+    tabindex="-1"
+    aria-labelledby="projectModalLabel{{ forloop.counter }}"
+    aria-hidden="true"
+>
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="experience-modal-title">
+                    <div>
+                        <h3 id="projectModalLabel{{ forloop.counter }}">{{ project.name }}</h3>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div
+                    id="projectCarousel{{ forloop.counter }}"
+                    class="carousel slide project-carousel"
+                    {% if project.has_multiple_images %}
+                    data-bs-ride="carousel"
+                    data-bs-interval="3000"
+                    {% endif %}
+                >
+                    <div class="carousel-inner">
+                        {% for image in project.gallery_images %}
+                        <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                            {% if image.is_static %}
+                            <img src="{% static image.src %}" alt="{{ image.alt }}">
+                            {% else %}
+                            <img src="{{ image.src }}" alt="{{ image.alt }}">
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if project.has_multiple_images %}
+                    <button class="carousel-control-prev" type="button" data-bs-target="#projectCarousel{{ forloop.counter }}" data-bs-slide="prev" aria-label="Previous image">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#projectCarousel{{ forloop.counter }}" data-bs-slide="next" aria-label="Next image">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    {% endif %}
+                </div>
+
+                {% if project.technologies %}
+                <p class="project-modal-label">Technologies</p>
+                <div class="project-modal-technologies" aria-label="Technologies">
+                    {% for technology in project.technologies %}
+                    <span class="project-technology-pill" title="{{ technology.name }}">
+                        <span class="skill-logo-fallback">{{ technology.initial }}</span>
+                        <img
+                            src="{{ technology.logo }}"
+                            alt="{{ technology.name }} logo"
+                            loading="lazy"
+                            onerror="this.style.display='none'; this.previousElementSibling.style.display='inline-flex';"
+                        >
+                        <span>{{ technology.name }}</span>
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if project.description %}
+                <p class="project-modal-label">Description</p>
+                    {% if project.description_points %}
+                    <ul class="project-description-list">
+                        {% for point in project.description_points %}
+                        <li>{{ point }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                        {% for paragraph in project.description_paragraphs %}
+                        <p class="project-modal-description">{{ paragraph }}</p>
+                        {% endfor %}
+                    {% endif %}
+                {% endif %}
+
+                {% if project.github_link %}
+                <a class="project-link-button" href="{{ project.github_link }}" target="_blank" rel="noopener">
+                    <i class="bi bi-github"></i>
+                    <span>GitHub</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
 {% endfor %}
 {% endblock %}

@@ -1,19 +1,34 @@
 from django.contrib import admin
 
-from .models import Company, ExperienceRole, ProfileDetail, Skill, SkillCategory, SocialLink
+from .models import (
+    Company,
+    ContactSubmission,
+    DynamicTemplate,
+    Education,
+    ExperienceRole,
+    ProfileDetail,
+    Project,
+    ProjectScreenshot,
+    ProjectTechnology,
+    Skill,
+    SkillCategory,
+    SocialLink,
+)
 
 
 @admin.register(ProfileDetail)
 class ProfileDetailAdmin(admin.ModelAdmin):
-    list_display = ('name', 'role', 'location_display', 'is_active', 'updated_at')
+    list_display = ('name', 'role', 'email', 'phone_number', 'location_display', 'is_active', 'updated_at')
     list_filter = ('is_active', 'created_at', 'updated_at')
-    search_fields = ('name', 'role', 'city', 'state', 'country')
+    search_fields = ('name', 'role', 'email', 'phone_number', 'city', 'state', 'country')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         ('Profile', {
             'fields': (
                 'name',
                 'role',
+                'email',
+                'phone_number',
                 'about_description',
                 'languages',
                 'city',
@@ -43,6 +58,62 @@ class SocialLinkAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Link', {
             'fields': ('name', 'url', 'is_active')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+
+@admin.register(ContactSubmission)
+class ContactSubmissionAdmin(admin.ModelAdmin):
+    list_display = (
+        'name',
+        'email',
+        'phone_number',
+        'subject',
+        'owner_email_sent',
+        'confirmation_email_sent',
+        'is_read',
+        'created_at',
+    )
+    list_filter = ('owner_email_sent', 'confirmation_email_sent', 'is_read', 'created_at')
+    search_fields = ('name', 'email', 'phone_number', 'subject', 'message')
+    readonly_fields = (
+        'name',
+        'email',
+        'phone_number',
+        'subject',
+        'message',
+        'owner_email_sent',
+        'confirmation_email_sent',
+        'email_error',
+        'created_at',
+        'updated_at',
+    )
+    fieldsets = (
+        ('Contact Details', {
+            'fields': ('name', 'email', 'phone_number', 'subject', 'message', 'is_read')
+        }),
+        ('Email Status', {
+            'fields': ('owner_email_sent', 'confirmation_email_sent', 'email_error')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+
+@admin.register(DynamicTemplate)
+class DynamicTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'is_active', 'updated_at')
+    list_filter = ('is_active', 'created_at', 'updated_at')
+    search_fields = ('name', 'slug', 'rich_enrichment')
+    readonly_fields = ('created_at', 'updated_at')
+    prepopulated_fields = {'slug': ('name',)}
+    fieldsets = (
+        ('Template', {
+            'fields': ('name', 'slug', 'rich_enrichment', 'is_active')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -161,3 +232,112 @@ class SkillAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at'),
         }),
     )
+
+
+@admin.register(ProjectTechnology)
+class ProjectTechnologyAdmin(admin.ModelAdmin):
+    list_display = ('name', 'display_order', 'is_active', 'updated_at')
+    list_filter = ('is_active', 'created_at', 'updated_at')
+    search_fields = ('name',)
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Technology', {
+            'fields': ('name', 'logo', 'display_order', 'is_active')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+
+class ProjectScreenshotInline(admin.TabularInline):
+    model = ProjectScreenshot
+    extra = 1
+    fields = ('image', 'caption', 'display_order', 'is_active')
+
+
+@admin.register(Project)
+class ProjectAdmin(admin.ModelAdmin):
+    list_display = ('name', 'display_order', 'github_link', 'is_active', 'updated_at')
+    list_filter = ('is_active', 'technologies', 'created_at', 'updated_at')
+    search_fields = ('name', 'description', 'github_link', 'technologies__name')
+    readonly_fields = ('created_at', 'updated_at')
+    filter_horizontal = ('technologies',)
+    inlines = (ProjectScreenshotInline,)
+    fieldsets = (
+        ('Project', {
+            'fields': (
+                'name',
+                'cover_image',
+                'technologies',
+                'description',
+                'github_link',
+                'display_order',
+                'is_active',
+            )
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+
+@admin.register(ProjectScreenshot)
+class ProjectScreenshotAdmin(admin.ModelAdmin):
+    list_display = ('project', 'caption', 'display_order', 'is_active', 'updated_at')
+    list_filter = ('project', 'is_active', 'created_at', 'updated_at')
+    search_fields = ('project__name', 'caption')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Screenshot', {
+            'fields': ('project', 'image', 'caption', 'display_order', 'is_active')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+
+@admin.register(Education)
+class EducationAdmin(admin.ModelAdmin):
+    list_display = (
+        'institution_name',
+        'degree_display',
+        'education_type',
+        'duration_display',
+        'score',
+        'display_order',
+        'is_active',
+        'updated_at',
+    )
+    list_filter = ('education_type', 'is_active', 'passing_year', 'created_at', 'updated_at')
+    search_fields = ('institution_name', 'degree_name', 'board_or_university', 'score')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Education', {
+            'fields': (
+                'education_type',
+                'institution_name',
+                'degree_name',
+                'board_or_university',
+                'score',
+                'start_year',
+                'passing_year',
+                'display_order',
+                'is_active',
+            )
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+    @admin.display(description='Degree')
+    def degree_display(self, obj):
+        return obj.degree_name or obj.get_education_type_display()
+
+    @admin.display(description='Duration')
+    def duration_display(self, obj):
+        if obj.start_year:
+            return f'{obj.start_year} - {obj.passing_year}'
+        return obj.passing_year

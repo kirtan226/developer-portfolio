@@ -1,14 +1,37 @@
 from django.http import JsonResponse
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.shortcuts import render
 from django.utils import timezone
 from django.views import View
+from django.views.decorators.http import require_POST
 from django.db.utils import DatabaseError, OperationalError, ProgrammingError
 from django.db.models import Prefetch
 
-from .models import Company, ExperienceRole, ProfileDetail, Skill, SkillCategory, SocialLink
+from .models import (
+    Company,
+    ContactSubmission,
+    Education,
+    ExperienceRole,
+    ProfileDetail,
+    Project,
+    ProjectScreenshot,
+    ProjectTechnology,
+    Skill,
+    SkillCategory,
+    SocialLink,
+)
+from .utils import send_contact_emails
 
 
 NOT_ADDED = 'Not Added'
+PROJECT_FALLBACK_IMAGE = 'images/projects/project-01/PROJECT_COVER_IMAGE.jpg'
+CONTACT_FIELD_LIMITS = {
+    'name': 24,
+    'email': 35,
+    'subject': 55,
+    'message': 355,
+}
 
 
 def get_active_profile():
@@ -56,6 +79,44 @@ def get_active_skill_categories():
                 queryset=Skill.objects.filter(is_active=True).order_by('display_order', 'name'),
             ))
             .distinct()
+            .order_by('display_order', 'name')
+        )
+    except (DatabaseError, OperationalError, ProgrammingError):
+        return []
+
+
+def get_active_educations():
+    try:
+        return Education.objects.filter(is_active=True).order_by(
+            'display_order',
+            '-passing_year',
+            'institution_name',
+        )
+    except (DatabaseError, OperationalError, ProgrammingError):
+        return []
+
+
+def get_active_projects():
+    try:
+        return (
+            Project.objects
+            .filter(is_active=True)
+            .prefetch_related(
+                Prefetch(
+                    'technologies',
+                    queryset=ProjectTechnology.objects.filter(is_active=True).order_by(
+                        'display_order',
+                        'name',
+                    ),
+                ),
+                Prefetch(
+                    'screenshots',
+                    queryset=ProjectScreenshot.objects.filter(is_active=True).order_by(
+                        'display_order',
+                        'id',
+                    ),
+                ),
+            )
             .order_by('display_order', 'name')
         )
     except (DatabaseError, OperationalError, ProgrammingError):
@@ -161,6 +222,22 @@ def parse_description_points(description):
     return points, paragraphs
 
 
+def parse_project_description(description):
+    cleaned_description = description.strip()
+
+    if not cleaned_description:
+        return [], []
+
+    if '•' in cleaned_description:
+        return [
+            point.strip()
+            for point in cleaned_description.split('•')
+            if point.strip()
+        ], []
+
+    return parse_description_points(cleaned_description)
+
+
 def build_companies():
     companies = []
 
@@ -217,10 +294,133 @@ def build_skill_categories():
     return skill_categories
 
 
+def format_education_duration(education):
+    if education.start_year:
+        return f'{education.start_year} - {education.passing_year}'
+    return str(education.passing_year)
+
+
+def build_educations():
+    educations = []
+
+    for education in get_active_educations():
+        degree = education.degree_name.strip() or education.get_education_type_display()
+        details = []
+
+        if education.board_or_university.strip():
+            details.append(education.board_or_university.strip())
+
+        if education.score.strip():
+            details.append(education.score.strip())
+
+        educations.append({
+            'institution': education.institution_name,
+            'degree': degree,
+            'education_type': education.get_education_type_display(),
+            'duration': format_education_duration(education),
+            'details': details,
+        })
+
+    return educations
+
+
+def image_item(src, alt, is_static=False):
+    return {
+        'src': src,
+        'alt': alt,
+        'is_static': is_static,
+    }
+
+
+def build_project_technologies(project):
+    technologies = []
+
+    for technology in project.technologies.all():
+        technologies.append({
+            'name': technology.name,
+            'logo': technology.logo.url if technology.logo else technology.auto_logo_url,
+            'initial': technology.name[:1].upper(),
+        })
+
+    return technologies
+
+
+def build_projects():
+    projects = []
+
+    for project in get_active_projects():
+        cover_image = (
+            image_item(project.cover_image.url, f'{project.name} cover image')
+            if project.cover_image
+            else image_item(PROJECT_FALLBACK_IMAGE, f'{project.name} cover image', is_static=True)
+        )
+        gallery_images = [
+            image_item(screenshot.image.url, screenshot.caption or f'{project.name} screenshot')
+            for screenshot in project.screenshots.all()
+            if screenshot.image
+        ]
+
+        if not gallery_images:
+            gallery_images = [cover_image]
+
+        description_points, description_paragraphs = parse_project_description(project.description)
+        technologies = build_project_technologies(project)
+
+        projects.append({
+            'name': project.name,
+            'cover_image': cover_image,
+            'technologies': technologies,
+            'technology_preview': technologies[:3],
+            'has_more_technologies': len(technologies) > 3,
+            'description': project.description.strip(),
+            'description_points': description_points,
+            'description_paragraphs': description_paragraphs,
+            'github_link': project.github_link.strip(),
+            'gallery_images': gallery_images,
+            'has_multiple_images': len(gallery_images) > 1,
+        })
+
+    return projects
+
+
+def validate_contact_form_data(contact_form):
+    errors = {}
+    required_messages = {
+        'name': 'Please fill name.',
+        'email': 'Please fill email.',
+        'subject': 'Please fill subject.',
+        'message': 'Please fill message.',
+    }
+    length_messages = {
+        'name': 'Name should be 24 characters or less.',
+        'email': 'Email should be 35 characters or less.',
+        'subject': 'Subject should be 55 characters or less.',
+        'message': 'Message should be 355 characters or less.',
+    }
+
+    for field, required_message in required_messages.items():
+        value = contact_form.get(field, '')
+
+        if not value:
+            errors[field] = required_message
+            continue
+
+        if len(value) > CONTACT_FIELD_LIMITS[field]:
+            errors[field] = length_messages[field]
+
+    if contact_form.get('email') and 'email' not in errors:
+        try:
+            validate_email(contact_form['email'])
+        except ValidationError:
+            errors['email'] = 'Please enter a valid email.'
+
+    return errors
+
+
 class HomeView(View):
     template_name = 'core/home.html'
 
-    def get(self, request, *args, **kwargs):
+    def build_context(self, contact_status=None, contact_form=None, contact_errors=None):
         profile = get_active_profile()
         profile_languages = normalize_languages(profile.languages) if profile else []
         name = profile.name.strip() if profile and profile.name.strip() else f'Name: {NOT_ADDED}'
@@ -239,7 +439,8 @@ class HomeView(View):
             'avatar': profile.profile_picture.url if profile and profile.profile_picture else '',
             'resume': profile.resume.url if profile and profile.resume else '',
             'fallback_avatar': 'images/avatar.jpg',
-            'email': 'example@gmail.com',
+            'email': profile.email.strip() if profile and profile.email.strip() else '',
+            'phone_number': profile.phone_number.strip() if profile and profile.phone_number.strip() else '',
             'location': location,
             'languages': profile_languages or [f'Languages: {NOT_ADDED}'],
         }
@@ -247,6 +448,8 @@ class HomeView(View):
         social_links = build_social_links()
         skill_categories = build_skill_categories()
         companies = build_companies()
+        educations = build_educations()
+        projects = build_projects()
         fallback_companies = [
             {
                 'company': 'FLY',
@@ -317,16 +520,22 @@ class HomeView(View):
                 'title': 'Experience',
                 'companies': companies or fallback_companies,
             },
-            'studies': {
-                'title': 'Studies',
-                'institutions': [
+            'education': {
+                'title': 'Education',
+                'items': educations or [
                     {
-                        'name': 'University of Jakarta',
-                        'description': 'Studied software engineering.',
+                        'institution': 'University of Jakarta',
+                        'degree': 'Software Engineering',
+                        'education_type': 'Bachelor',
+                        'duration': '2020 - 2024',
+                        'details': ['University of Jakarta', '8.4 CGPA'],
                     },
                     {
-                        'name': 'Build the Future',
-                        'description': 'Studied online marketing and personal branding.',
+                        'institution': 'Build the Future',
+                        'degree': 'Online Marketing',
+                        'education_type': 'Diploma',
+                        'duration': '2019',
+                        'details': ['Personal branding', '85%'],
                     },
                 ],
             },
@@ -340,24 +549,116 @@ class HomeView(View):
             'person': person,
             'social_links': social_links,
             'about': about,
-            'projects': [
+            'projects': projects or [
                 {
-                    'title': 'Once UI Design System',
+                    'name': 'Once UI Design System',
                     'description': 'A customizable design system built for fast, consistent product interfaces.',
-                    'image': 'images/projects/project-01/cover-01.jpg',
-                    'tags': ['Design System', 'UI Engineering'],
+                    'cover_image': image_item('images/projects/project-01/cover-01.jpg', 'Once UI Design System cover image', is_static=True),
+                    'technologies': [
+                        {
+                            'name': 'Django',
+                            'logo': 'https://cdn.simpleicons.org/django',
+                            'initial': 'D',
+                        },
+                        {
+                            'name': 'Bootstrap',
+                            'logo': 'https://cdn.simpleicons.org/bootstrap',
+                            'initial': 'B',
+                        },
+                    ],
+                    'github_link': '',
+                    'gallery_images': [
+                        image_item('images/projects/project-01/cover-01.jpg', 'Once UI Design System cover image', is_static=True),
+                    ],
+                    'has_multiple_images': False,
                 },
                 {
-                    'title': 'Figma to Code Pipeline',
+                    'name': 'Figma to Code Pipeline',
                     'description': 'A workflow that automates design handovers and speeds up production builds.',
-                    'image': 'images/projects/project-01/cover-02.jpg',
-                    'tags': ['Automation', 'Frontend'],
+                    'cover_image': image_item('images/projects/project-01/cover-02.jpg', 'Figma to Code Pipeline cover image', is_static=True),
+                    'technologies': [
+                        {
+                            'name': 'Python',
+                            'logo': 'https://cdn.simpleicons.org/python',
+                            'initial': 'P',
+                        },
+                        {
+                            'name': 'JavaScript',
+                            'logo': 'https://cdn.simpleicons.org/javascript',
+                            'initial': 'J',
+                        },
+                    ],
+                    'github_link': '',
+                    'gallery_images': [
+                        image_item('images/projects/project-01/cover-02.jpg', 'Figma to Code Pipeline cover image', is_static=True),
+                    ],
+                    'has_multiple_images': False,
                 },
             ],
             'current_year': timezone.now().year,
             'page_title': f"{person['name']} Portfolio",
+            'contact_status': contact_status,
+            'contact_form': contact_form or {},
+            'contact_errors': contact_errors or {},
         }
-        return render(request, self.template_name, context)
+        return context
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name, self.build_context())
+
+
+@require_POST
+def contact_submit_api(request):
+    contact_form = {
+        'name': request.POST.get('name', '').strip(),
+        'email': request.POST.get('email', '').strip(),
+        'subject': request.POST.get('subject', '').strip(),
+        'message': request.POST.get('message', '').strip(),
+    }
+    errors = validate_contact_form_data(contact_form)
+
+    if errors:
+        return JsonResponse({
+            'ok': False,
+            'message': 'Please fix the highlighted fields.',
+            'errors': errors,
+        }, status=400)
+
+    contact_submission = ContactSubmission.objects.create(**contact_form)
+    profile = get_active_profile()
+
+    try:
+        owner_sent, confirmation_sent = send_contact_emails(contact_submission, profile)
+        contact_submission.owner_email_sent = owner_sent
+        contact_submission.confirmation_email_sent = confirmation_sent
+
+        if not owner_sent:
+            contact_submission.email_error = 'Profile email is not configured.'
+
+        contact_submission.save(update_fields=[
+            'owner_email_sent',
+            'confirmation_email_sent',
+            'email_error',
+            'updated_at',
+        ])
+        status_message = 'Your message has been sent.'
+
+        if not owner_sent:
+            status_message = 'Your message was saved, but owner email is not configured.'
+
+        return JsonResponse({
+            'ok': True,
+            'message': status_message,
+        })
+    except Exception as exc:
+        error_message = str(exc)
+        contact_submission.email_error = error_message
+        contact_submission.save(update_fields=['email_error', 'updated_at'])
+        return JsonResponse({
+            'ok': False,
+            'message': f'Your message was saved, but email delivery failed: {error_message}',
+            'errors': {},
+        }, status=500)
 
 
 def profile_detail_api(request):
@@ -367,6 +668,8 @@ def profile_detail_api(request):
         return JsonResponse({
             'name': f'Name: {NOT_ADDED}',
             'role': f'Role: {NOT_ADDED}',
+            'email': '',
+            'phone_number': '',
             'about_description': f'About: {NOT_ADDED}',
             'languages': [f'Languages: {NOT_ADDED}'],
             'location': f'Location: {NOT_ADDED}',
@@ -381,6 +684,8 @@ def profile_detail_api(request):
     return JsonResponse({
         'name': profile.name or f'Name: {NOT_ADDED}',
         'role': profile.role or f'Role: {NOT_ADDED}',
+        'email': profile.email,
+        'phone_number': profile.phone_number,
         'about_description': profile.about_description or f'About: {NOT_ADDED}',
         'languages': normalize_languages(profile.languages) or [f'Languages: {NOT_ADDED}'],
         'location': format_location(profile),

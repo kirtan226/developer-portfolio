@@ -43,6 +43,8 @@ INSTALLED_APPS = [
 
     'core',
     'django_celery_beat',
+    'ckeditor',
+    'ckeditor_uploader',
 ]
 
 MIDDLEWARE = [
@@ -140,6 +142,22 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# ==== CKEditor configurations ====
+
+CKEDITOR_UPLOAD_PATH = "uploads/ckeditor/"
+
+CKEDITOR_CONFIGS = {
+    "default": {
+        "toolbar": "full",
+        "height": 400,
+        "width": "auto",
+        "extraPlugins": ",".join([
+            "uploadimage",
+            "image2",
+        ]),
+    },
+}
 
 # ==== Email configurations ====
 

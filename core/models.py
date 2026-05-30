@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.text import slugify
+from ckeditor_uploader.fields import RichTextUploadingField
 
 
 MONTH_CHOICES = [
@@ -29,6 +30,8 @@ class CommonModel(models.Model):
 class ProfileDetail(CommonModel):
     name = models.CharField(max_length=120, blank=True)
     role = models.CharField(max_length=160, blank=True)
+    email = models.EmailField(blank=True)
+    phone_number = models.CharField(max_length=30, blank=True)
     about_description = models.TextField(blank=True)
     languages = models.JSONField(default=list, blank=True)
     city = models.CharField(max_length=80, blank=True)
@@ -73,6 +76,47 @@ class SocialLink(CommonModel):
 
     def __str__(self):
         return self.get_name_display()
+
+
+class ContactSubmission(CommonModel):
+    name = models.CharField(max_length=24)
+    email = models.EmailField(max_length=35)
+    phone_number = models.CharField(max_length=30, blank=True)
+    subject = models.CharField(max_length=55)
+    message = models.TextField()
+    owner_email_sent = models.BooleanField(default=False)
+    confirmation_email_sent = models.BooleanField(default=False)
+    email_error = models.TextField(blank=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'Contact Submission'
+        verbose_name_plural = 'Contact Submissions'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.name} - {self.subject or "Contact message"}'
+
+
+class DynamicTemplate(CommonModel):
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
+    rich_enrichment = RichTextUploadingField()
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Dynamic Template'
+        verbose_name_plural = 'Dynamic Templates'
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
 
 
 class Company(CommonModel):
@@ -173,3 +217,120 @@ class Skill(CommonModel):
             icon_slug = slugify(normalized_name).replace('-', '')
 
         return f'https://cdn.simpleicons.org/{icon_slug}'
+
+
+class ProjectTechnology(CommonModel):
+    SIMPLE_ICON_ALIASES = Skill.SIMPLE_ICON_ALIASES
+
+    name = models.CharField(max_length=120)
+    logo = models.FileField(upload_to='project-technologies/', blank=True, null=True)
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Project Technology'
+        verbose_name_plural = 'Project Technologies'
+        ordering = ['display_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def auto_logo_url(self):
+        normalized_name = self.name.strip().lower()
+        icon_slug = self.SIMPLE_ICON_ALIASES.get(normalized_name)
+
+        if not icon_slug:
+            icon_slug = slugify(normalized_name).replace('-', '')
+
+        return f'https://cdn.simpleicons.org/{icon_slug}'
+
+
+class Project(CommonModel):
+    name = models.CharField(max_length=160)
+    cover_image = models.FileField(upload_to='projects/covers/', blank=True, null=True)
+    technologies = models.ManyToManyField(ProjectTechnology, blank=True, related_name='projects')
+    description = models.TextField(blank=True)
+    github_link = models.CharField(max_length=300, blank=True)
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Project'
+        verbose_name_plural = 'Projects'
+        ordering = ['display_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
+class ProjectScreenshot(CommonModel):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name='screenshots',
+    )
+    image = models.FileField(upload_to='projects/screenshots/')
+    caption = models.CharField(max_length=160, blank=True)
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Project Screenshot'
+        verbose_name_plural = 'Project Screenshots'
+        ordering = ['display_order', 'id']
+
+    def __str__(self):
+        return self.caption or f'{self.project.name} screenshot'
+
+
+class Education(CommonModel):
+
+    class EducationType(models.TextChoices):
+        HSC = "hsc", "HSC (12th)"
+        SSC = "ssc", "SSC (10th)"
+        DIPLOMA = "diploma", "Diploma"
+        BACHELOR = "bachelor", "Bachelor's Degree"
+        MASTER = "master", "Master's Degree"
+
+    education_type = models.CharField(
+        max_length=20,
+        choices=EducationType.choices
+    )
+
+    institution_name = models.CharField(max_length=255)
+
+    degree_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="B.E. Computer Engineering, HSC Science, SSC etc."
+    )
+
+    board_or_university = models.CharField(
+        max_length=255,
+        blank=True
+    )
+
+    score = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="8.4 CGPA, 85%, A Grade"
+    )
+
+    start_year = models.PositiveIntegerField(
+        null=True,
+        blank=True
+    )
+
+    passing_year = models.PositiveIntegerField()
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Education'
+        verbose_name_plural = 'Education'
+        ordering = ['display_order', '-passing_year', 'institution_name']
+
+    def __str__(self):
+        degree = self.degree_name or self.get_education_type_display()
+        return f'{degree} - {self.institution_name}'
