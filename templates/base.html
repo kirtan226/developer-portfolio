@@ -36,7 +36,7 @@
     </main>
 
     <footer class="site-footer">
-        <p><span>&copy; {{ current_year }} /</span> {{ person.name }} <span>/ Build your portfolio with Once UI</span></p>
+        <p>{{ person.footer_text }}</p>
         {% if social_links %}
         <div class="footer-social">
             {% for item in social_links %}

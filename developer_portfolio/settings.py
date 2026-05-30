@@ -25,10 +25,33 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
-ALLOWED_HOSTS = []
+def env_bool(name, default=False):
+    value = os.environ.get(name)
+
+    if value is None:
+        return default
+
+    return value.strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def env_list(name, default=''):
+    value = os.environ.get(name, default)
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = env_bool('DEBUG', False)
+
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', '127.0.0.1,localhost')
+
+
+def normalize_url_path(value, default):
+    url_path = (value or default).strip().strip('/')
+    return f'{url_path}/'
+
+
+ADMIN_URL = normalize_url_path(os.environ.get('ADMIN_URL'), 'admin')
 
 
 # Application definition

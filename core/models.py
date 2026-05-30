@@ -34,6 +34,7 @@ class ProfileDetail(CommonModel):
     email = models.EmailField(blank=True)
     phone_number = models.CharField(max_length=30, blank=True)
     about_description = models.TextField(blank=True)
+    footer_text = models.CharField(max_length=160, blank=True)
     languages = models.JSONField(default=list, blank=True)
     city = models.CharField(max_length=80, blank=True)
     state = models.CharField(max_length=80, blank=True)

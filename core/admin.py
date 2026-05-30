@@ -32,6 +32,7 @@ class ProfileDetailAdmin(admin.ModelAdmin):
                 'email',
                 'phone_number',
                 'about_description',
+                'footer_text',
                 'languages',
                 'city',
                 'state',

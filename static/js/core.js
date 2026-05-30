@@ -65,6 +65,10 @@
         .filter(Boolean);
 
     function setActiveSection() {
+        if (!sections.length) {
+            return;
+        }
+
         const scrollPosition = window.scrollY;
         const activationPoint = scrollPosition + Math.min(window.innerHeight * 0.35, 240);
         let activeSection = sections[0];

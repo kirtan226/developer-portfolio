@@ -447,6 +447,11 @@ class HomeView(View):
             'name': name,
             'first_name': name.split()[0] if name and NOT_ADDED not in name else NOT_ADDED,
             'role': role,
+            'footer_text': (
+                profile.footer_text.strip()
+                if profile and profile.footer_text.strip()
+                else f'© {timezone.now().year} / {name} all rights reserved'
+            ),
             'avatar': profile.profile_picture.url if profile and profile.profile_picture else '',
             'resume': profile.resume.url if profile and profile.resume else '',
             'fallback_avatar': 'images/avatar.jpg',
@@ -739,3 +744,23 @@ def social_links_api(request):
     return JsonResponse({
         'social_links': build_social_links(),
     })
+
+
+def page_not_found(request, exception=None):
+    profile = get_active_profile()
+    name = profile.name.strip() if profile and profile.name.strip() else 'Portfolio'
+
+    context = {
+        'person': {
+            'name': name,
+            'footer_text': (
+                profile.footer_text.strip()
+                if profile and profile.footer_text.strip()
+                else f'© {timezone.now().year} / {name} all rights reserved'
+            ),
+        },
+        'social_links': build_social_links(),
+        'current_year': timezone.now().year,
+        'page_title': 'Page Not Found',
+    }
+    return render(request, '404.html', context, status=404)
