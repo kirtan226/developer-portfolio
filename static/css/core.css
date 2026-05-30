@@ -69,7 +69,8 @@ a {
 
 .page-dots,
 .site-header,
-main,
+.portfolio-shell,
+.not-found-shell,
 .site-footer {
     animation: page-enter-clear 1100ms cubic-bezier(0.19, 1, 0.22, 1) both;
     transform-origin: center top;
@@ -79,7 +80,8 @@ main,
     animation-delay: 90ms;
 }
 
-main {
+.portfolio-shell,
+.not-found-shell {
     animation-delay: 160ms;
 }
 
@@ -1376,7 +1378,8 @@ li {
 
     .page-dots,
     .site-header,
-    main,
+    .portfolio-shell,
+    .not-found-shell,
     .site-footer {
         filter: none !important;
         opacity: 1 !important;
