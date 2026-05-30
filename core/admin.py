@@ -42,6 +42,14 @@ class ProfileDetailAdmin(admin.ModelAdmin):
                 'is_active',
             )
         }),
+        ('Browser Tab Animation', {
+            'fields': (
+                'browser_tab_icon_text',
+                'browser_tab_animation_speed_ms',
+                'browser_tab_title_frames',
+            ),
+            'description': 'Controls the animated browser tab title and KP icon. Add title frames as a JSON list of strings.',
+        }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
         }),

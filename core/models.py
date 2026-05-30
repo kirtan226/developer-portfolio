@@ -41,6 +41,21 @@ class ProfileDetail(CommonModel):
     country = models.CharField(max_length=80, blank=True)
     profile_picture = models.FileField(upload_to='profile/', blank=True, null=True)
     resume = models.FileField(upload_to='resume/', blank=True, null=True)
+    browser_tab_icon_text = models.CharField(
+        max_length=4,
+        blank=True,
+        default='KP',
+        help_text='Short text for the animated browser tab icon, for example KP.',
+    )
+    browser_tab_animation_speed_ms = models.PositiveIntegerField(
+        default=1600,
+        help_text='Browser tab animation speed in milliseconds. Higher means slower.',
+    )
+    browser_tab_title_frames = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of browser tab title frames, for example ["def build_portfolio():", "print(\'Kirtan Patel\')"].',
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:

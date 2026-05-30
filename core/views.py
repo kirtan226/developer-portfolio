@@ -38,6 +38,13 @@ CONTACT_FIELD_LIMITS = {
     'subject': 55,
     'message': 355,
 }
+DEFAULT_BROWSER_TAB_FRAMES = [
+    'class KirtanPatel(Developer):',
+    'portfolio = KirtanPatel()',
+    'def build_portfolio():',
+    "print('Kirtan Patel')",
+    'python manage.py runserver',
+]
 
 
 def get_active_profile():
@@ -150,6 +157,35 @@ def format_location(profile):
     ]
     location = ', '.join(part for part in parts if part)
     return location or f'Location: {NOT_ADDED}'
+
+
+def build_browser_tab_config(profile, page_title):
+    title_frames = []
+
+    if profile and isinstance(profile.browser_tab_title_frames, list):
+        title_frames = [
+            str(frame).strip()
+            for frame in profile.browser_tab_title_frames
+            if str(frame).strip()
+        ]
+
+    if not title_frames:
+        title_frames = DEFAULT_BROWSER_TAB_FRAMES.copy()
+
+    if page_title and page_title not in title_frames:
+        title_frames.append(page_title)
+
+    animation_speed = profile.browser_tab_animation_speed_ms if profile else 1600
+    if not isinstance(animation_speed, int) or animation_speed < 500:
+        animation_speed = 1600
+
+    icon_text = profile.browser_tab_icon_text.strip() if profile and profile.browser_tab_icon_text.strip() else 'KP'
+
+    return {
+        'iconText': icon_text[:4],
+        'speedMs': animation_speed,
+        'titleFrames': title_frames,
+    }
 
 
 def social_icon_for(name):
@@ -561,6 +597,8 @@ class HomeView(View):
             },
         }
 
+        page_title = f"{person['name']} Portfolio"
+
         context = {
             'person': person,
             'social_links': social_links,
@@ -612,7 +650,8 @@ class HomeView(View):
                 },
             ],
             'current_year': timezone.now().year,
-            'page_title': f"{person['name']} Portfolio",
+            'page_title': page_title,
+            'browser_tab_config': build_browser_tab_config(profile, page_title),
             'contact_status': contact_status,
             'contact_form': contact_form or {},
             'contact_errors': contact_errors or {},
@@ -718,6 +757,9 @@ def profile_detail_api(request):
             'country': '',
             'profile_picture': None,
             'resume': None,
+            'browser_tab_icon_text': 'KP',
+            'browser_tab_animation_speed_ms': 1600,
+            'browser_tab_title_frames': DEFAULT_BROWSER_TAB_FRAMES,
             'is_active': False,
         })
 
@@ -734,6 +776,9 @@ def profile_detail_api(request):
         'country': profile.country,
         'profile_picture': profile.profile_picture.url if profile.profile_picture else None,
         'resume': profile.resume.url if profile.resume else None,
+        'browser_tab_icon_text': profile.browser_tab_icon_text,
+        'browser_tab_animation_speed_ms': profile.browser_tab_animation_speed_ms,
+        'browser_tab_title_frames': profile.browser_tab_title_frames,
         'is_active': profile.is_active,
         'created_at': profile.created_at.isoformat(),
         'updated_at': profile.updated_at.isoformat(),
@@ -762,5 +807,6 @@ def page_not_found(request, exception=None):
         'social_links': build_social_links(),
         'current_year': timezone.now().year,
         'page_title': 'Page Not Found',
+        'browser_tab_config': build_browser_tab_config(profile, 'Page Not Found'),
     }
     return render(request, '404.html', context, status=404)

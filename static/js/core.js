@@ -14,6 +14,104 @@
 
     setTheme(storedTheme || "dark");
 
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const originalTitle = document.title.trim() || "Kirtan Patel Portfolio";
+    const browserTabConfigNode = document.getElementById("browser-tab-config");
+    let browserTabConfig = {};
+
+    if (browserTabConfigNode) {
+        try {
+            browserTabConfig = JSON.parse(browserTabConfigNode.textContent);
+        } catch (error) {
+            browserTabConfig = {};
+        }
+    }
+
+    function startHeadTitleAnimation() {
+        if (reduceMotion) {
+            return;
+        }
+
+        const fallbackTitleFrames = [
+            "class KirtanPatel(Developer):",
+            "portfolio = KirtanPatel()",
+            "def build_portfolio():",
+            "print('Kirtan Patel')",
+            "python manage.py runserver",
+            originalTitle,
+        ];
+        const titleFrames = Array.isArray(browserTabConfig.titleFrames) && browserTabConfig.titleFrames.length
+            ? browserTabConfig.titleFrames
+            : fallbackTitleFrames;
+        const speedMs = Math.max(Number(browserTabConfig.speedMs) || 1600, 500);
+        let titleFrame = 0;
+
+        window.setInterval(function () {
+            document.title = titleFrames[titleFrame % titleFrames.length];
+            titleFrame += 1;
+        }, speedMs);
+    }
+
+    function startFaviconAnimation() {
+        if (reduceMotion) {
+            return;
+        }
+
+        const canvas = document.createElement("canvas");
+        const size = 64;
+        const context = canvas.getContext("2d");
+        let favicon = document.querySelector("link[rel='icon']");
+        let faviconFrame = 0;
+
+        if (!context) {
+            return;
+        }
+
+        canvas.width = size;
+        canvas.height = size;
+
+        if (!favicon) {
+            favicon = document.createElement("link");
+            favicon.rel = "icon";
+            document.head.appendChild(favicon);
+        }
+
+        function drawFavicon() {
+            const hue = (190 + faviconFrame * 18) % 360;
+            const gradient = context.createLinearGradient(0, 0, size, size);
+            const iconText = String(browserTabConfig.iconText || "KP").slice(0, 4).toUpperCase();
+            const fontSize = iconText.length > 2 ? 18 : 22;
+
+            gradient.addColorStop(0, "hsl(" + hue + " 90% 72%)");
+            gradient.addColorStop(1, "hsl(" + ((hue + 140) % 360) + " 85% 66%)");
+
+            context.clearRect(0, 0, size, size);
+            context.fillStyle = "#090b0d";
+            context.beginPath();
+            context.arc(size / 2, size / 2, 30, 0, Math.PI * 2);
+            context.fill();
+
+            context.lineWidth = 4;
+            context.strokeStyle = gradient;
+            context.stroke();
+
+            context.fillStyle = gradient;
+            context.font = "700 " + fontSize + "px Arial, sans-serif";
+            context.textAlign = "center";
+            context.textBaseline = "middle";
+            context.fillText(iconText, size / 2, size / 2 + 1);
+
+            favicon.href = canvas.toDataURL("image/png");
+            faviconFrame += 1;
+        }
+
+        drawFavicon();
+        window.setInterval(drawFavicon, Math.max(Number(browserTabConfig.speedMs) || 1600, 500));
+    }
+
+    startHeadTitleAnimation();
+    startFaviconAnimation();
+
     if (themeToggle) {
         themeToggle.addEventListener("click", function () {
             const nextTheme = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
