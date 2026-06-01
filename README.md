@@ -2,6 +2,11 @@
 
 A backend-controlled Django portfolio website. The portfolio content is managed from Django admin, so profile details, skills, work experience, education, projects, project screenshots, social links, resume, notifications, and visitor tracking can be updated without changing templates or redeploying code.
 
+## 🌐 Live Links
+
+- Live site with backend: [https://kirtanpatel2261.pythonanywhere.com/](https://kirtanpatel2261.pythonanywhere.com/)
+- Demo preview without backend: [https://kirtan-portfolio.onrender.com/](https://kirtan-portfolio.onrender.com/)
+
 ## ✨ Features
 
 - Dynamic profile section with name, role, location, languages, profile photo, resume, and animated browser tab settings.
