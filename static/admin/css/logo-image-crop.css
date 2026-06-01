@@ -1,0 +1,80 @@
+.logo-crop-panel {
+    margin-top: 8px;
+    max-width: 480px;
+    padding: 12px;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background: var(--body-bg, #fff);
+}
+
+.logo-crop-panel[hidden] {
+    display: none;
+}
+
+.logo-crop-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.logo-crop-canvas {
+    width: 180px;
+    height: 180px;
+    max-width: 100%;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background-color: #fff;
+    background-image:
+        linear-gradient(45deg, #eee 25%, transparent 25%),
+        linear-gradient(-45deg, #eee 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #eee 75%),
+        linear-gradient(-45deg, transparent 75%, #eee 75%);
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    background-size: 20px 20px;
+    cursor: grab;
+    touch-action: none;
+}
+
+.logo-crop-canvas:active {
+    cursor: grabbing;
+}
+
+.logo-crop-controls {
+    min-width: 180px;
+    flex: 1;
+}
+
+.logo-crop-controls label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.logo-crop-controls input[type="range"] {
+    width: 100%;
+}
+
+.logo-crop-preview {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    margin-top: 12px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.logo-crop-preview img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+.logo-crop-note {
+    margin: 8px 0 0;
+    color: var(--body-quiet-color, #666);
+    font-size: 0.8125rem;
+}

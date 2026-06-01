@@ -1,0 +1,65 @@
+.profile-crop-panel {
+    margin-top: 12px;
+    max-width: 560px;
+    padding: 14px;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background: var(--body-bg, #fff);
+}
+
+.profile-crop-panel[hidden] {
+    display: none;
+}
+
+.profile-crop-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.profile-crop-canvas {
+    width: 260px;
+    height: 260px;
+    max-width: 100%;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background: #111;
+    cursor: grab;
+    touch-action: none;
+}
+
+.profile-crop-canvas:active {
+    cursor: grabbing;
+}
+
+.profile-crop-controls {
+    min-width: 210px;
+    flex: 1;
+}
+
+.profile-crop-controls label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.profile-crop-controls input[type="range"] {
+    width: 100%;
+}
+
+.profile-crop-preview {
+    width: 160px;
+    height: 160px;
+    margin-top: 14px;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 50%;
+    object-fit: cover;
+    background: #111;
+}
+
+.profile-crop-note {
+    margin: 10px 0 0;
+    color: var(--body-quiet-color, #666);
+    font-size: 0.8125rem;
+}

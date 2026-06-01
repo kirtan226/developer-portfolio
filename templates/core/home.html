@@ -119,7 +119,13 @@
                                     <p class="accent-text">{{ role.role }}</p>
                                     <span>{{ role.timeframe }}</span>
                                 </div>
-                                {% if role.preview %}
+                                {% if role.preview_points %}
+                                <ul class="experience-preview-list">
+                                    {% for point in role.preview_points %}
+                                    <li>{{ point }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% elif role.preview %}
                                 <p class="experience-preview">{{ role.preview }}</p>
                                 {% endif %}
                                 <button

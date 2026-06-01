@@ -2,6 +2,7 @@ from django.http import JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.shortcuts import render
+from django.templatetags.static import static
 from django.utils import timezone
 from django.views import View
 from django.views.decorators.http import require_POST
@@ -15,8 +16,8 @@ from .models import (
     ExperienceRole,
     ProfileDetail,
     Project,
+    ProjectSkill,
     ProjectScreenshot,
-    ProjectTechnology,
     Skill,
     SkillCategory,
     SocialLink,
@@ -31,6 +32,8 @@ from .utils import (
 
 NOT_ADDED = 'Not Added'
 PROJECT_FALLBACK_IMAGE = 'images/projects/project-01/PROJECT_COVER_IMAGE.jpg'
+SITE_ICON_IMAGE = 'images/site-icon.svg'
+SITE_SHARE_IMAGE = 'images/og/home.jpg'
 CONTACT_FIELD_LIMITS = {
     'name': 24,
     'email': 35,
@@ -38,6 +41,8 @@ CONTACT_FIELD_LIMITS = {
     'subject': 55,
     'message': 355,
 }
+
+
 DEFAULT_BROWSER_TAB_FRAMES = [
     'class KirtanPatel(Developer):',
     'portfolio = KirtanPatel()',
@@ -56,7 +61,7 @@ def get_active_profile():
 
 def get_active_social_links():
     try:
-        return SocialLink.objects.filter(is_active=True).exclude(url='').order_by('name')
+        return SocialLink.objects.filter(is_active=True).exclude(url='').order_by('display_order', 'created_at', 'name')
     except (DatabaseError, OperationalError, ProgrammingError):
         return []
 
@@ -116,8 +121,8 @@ def get_active_projects():
             .filter(is_active=True)
             .prefetch_related(
                 Prefetch(
-                    'technologies',
-                    queryset=ProjectTechnology.objects.filter(is_active=True).order_by(
+                    'project_skills',
+                    queryset=ProjectSkill.objects.filter(is_active=True).order_by(
                         'display_order',
                         'name',
                     ),
@@ -188,6 +193,37 @@ def build_browser_tab_config(profile, page_title):
     }
 
 
+def build_absolute_asset_url(request, asset_path):
+    asset_url = static(asset_path)
+
+    if request:
+        return request.build_absolute_uri(asset_url)
+
+    return asset_url
+
+
+def build_share_metadata(request, page_title, description):
+    cleaned_description = ' '.join(description.split()) if description else ''
+    share_description = (
+        cleaned_description
+        if description and NOT_ADDED not in description
+        else 'Portfolio website showcasing design engineering work.'
+    )
+    page_url = request.build_absolute_uri(request.path) if request else ''
+
+    return {
+        'title': page_title,
+        'description': share_description,
+        'url': page_url,
+        'site_name': page_title,
+        'image': build_absolute_asset_url(request, SITE_SHARE_IMAGE),
+        'image_width': 1920,
+        'image_height': 1200,
+        'image_alt': page_title,
+        'icon': build_absolute_asset_url(request, SITE_ICON_IMAGE),
+    }
+
+
 def social_icon_for(name):
     normalized_name = name.strip().lower()
     icon_map = {
@@ -245,17 +281,29 @@ def format_role_duration(role):
 
 
 def parse_description_points(description):
+    cleaned_description = description.strip()
+
+    if not cleaned_description:
+        return [], []
+
+    if '•' in cleaned_description:
+        return [
+            point.strip()
+            for point in cleaned_description.split('•')
+            if point.strip()
+        ], []
+
     points = []
     paragraphs = []
 
-    for line in description.splitlines():
+    for line in cleaned_description.splitlines():
         cleaned_line = line.strip()
 
         if not cleaned_line:
             continue
 
-        if cleaned_line.startswith('-'):
-            points.append(cleaned_line.lstrip('-').strip())
+        if cleaned_line.startswith(('-', '*')):
+            points.append(cleaned_line.lstrip('-*').strip())
         elif points:
             points[-1] = f'{points[-1]} {cleaned_line}'
         else:
@@ -288,13 +336,15 @@ def build_companies():
 
         for role in company.roles.all():
             bullet_points, paragraphs = parse_description_points(role.description)
-            preview_text = ' '.join(bullet_points or paragraphs)
+            preview_points = bullet_points[:2]
+            preview_text = ' '.join(paragraphs) if not preview_points else ''
 
             roles.append({
                 'role': role.role,
                 'timeframe': format_role_duration(role),
                 'description': role.description.strip(),
                 'preview': preview_text,
+                'preview_points': preview_points,
                 'bullet_points': bullet_points,
                 'paragraphs': paragraphs,
             })
@@ -321,7 +371,7 @@ def build_skill_categories():
 
             skills.append({
                 'name': skill.name,
-                'logo': skill.logo.url if skill.logo else skill.auto_logo_url,
+                'logo': skill.logo.url if skill.logo else skill.logo_url.strip() or skill.auto_logo_url,
                 'has_uploaded_logo': bool(skill.logo),
                 'initial': skill.name[:1].upper(),
                 'display_order': skill.display_order,
@@ -377,10 +427,10 @@ def image_item(src, alt, is_static=False):
 def build_project_technologies(project):
     technologies = []
 
-    for technology in project.technologies.all():
+    for technology in project.project_skills.all():
         technologies.append({
             'name': technology.name,
-            'logo': technology.logo.url if technology.logo else technology.auto_logo_url,
+            'logo': technology.logo.url if technology.logo else technology.logo_url.strip() or technology.auto_logo_url,
             'initial': technology.name[:1].upper(),
         })
 
@@ -467,7 +517,7 @@ def validate_contact_form_data(contact_form):
 class HomeView(View):
     template_name = 'core/home.html'
 
-    def build_context(self, contact_status=None, contact_form=None, contact_errors=None):
+    def build_context(self, request=None, contact_status=None, contact_form=None, contact_errors=None):
         profile = get_active_profile()
         profile_languages = normalize_languages(profile.languages) if profile else []
         name = profile.name.strip() if profile and profile.name.strip() else f'Name: {NOT_ADDED}'
@@ -651,6 +701,7 @@ class HomeView(View):
             ],
             'current_year': timezone.now().year,
             'page_title': page_title,
+            'share_metadata': build_share_metadata(request, page_title, about_description),
             'browser_tab_config': build_browser_tab_config(profile, page_title),
             'contact_status': contact_status,
             'contact_form': contact_form or {},
@@ -667,7 +718,7 @@ class HomeView(View):
         except (DatabaseError, OperationalError, ProgrammingError):
             site_visit = None
 
-        context = self.build_context()
+        context = self.build_context(request=request)
         context['site_visit'] = site_visit
         return render(request, self.template_name, context)
 
@@ -794,6 +845,7 @@ def social_links_api(request):
 def page_not_found(request, exception=None):
     profile = get_active_profile()
     name = profile.name.strip() if profile and profile.name.strip() else 'Portfolio'
+    page_title = 'Page Not Found'
 
     context = {
         'person': {
@@ -806,7 +858,8 @@ def page_not_found(request, exception=None):
         },
         'social_links': build_social_links(),
         'current_year': timezone.now().year,
-        'page_title': 'Page Not Found',
-        'browser_tab_config': build_browser_tab_config(profile, 'Page Not Found'),
+        'page_title': page_title,
+        'share_metadata': build_share_metadata(request, page_title, 'Page not found.'),
+        'browser_tab_config': build_browser_tab_config(profile, page_title),
     }
     return render(request, '404.html', context, status=404)

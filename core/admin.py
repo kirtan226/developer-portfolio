@@ -9,8 +9,8 @@ from .models import (
     NotificationSetting,
     ProfileDetail,
     Project,
+    ProjectSkill,
     ProjectScreenshot,
-    ProjectTechnology,
     Skill,
     SkillCategory,
     SocialLink,
@@ -55,6 +55,12 @@ class ProfileDetailAdmin(admin.ModelAdmin):
         }),
     )
 
+    class Media:
+        css = {
+            'all': ('admin/css/profile-image-crop.css',)
+        }
+        js = ('admin/js/profile-image-crop.js',)
+
     @admin.display(description='Location')
     def location_display(self, obj):
         return ', '.join(part for part in [obj.city, obj.state, obj.country] if part) or 'Not Added'
@@ -62,13 +68,15 @@ class ProfileDetailAdmin(admin.ModelAdmin):
 
 @admin.register(SocialLink)
 class SocialLinkAdmin(admin.ModelAdmin):
-    list_display = ('name', 'url', 'is_active', 'updated_at')
+    list_display = ('name', 'url', 'display_order', 'is_active', 'updated_at')
+    list_editable = ('display_order', 'is_active')
     list_filter = ('is_active', 'created_at', 'updated_at')
     search_fields = ('name', 'url')
+    ordering = ('display_order', 'created_at', 'name')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         ('Link', {
-            'fields': ('name', 'url', 'is_active')
+            'fields': ('name', 'url', 'display_order', 'is_active')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -339,7 +347,13 @@ class ExperienceRoleAdmin(admin.ModelAdmin):
 class SkillInline(admin.TabularInline):
     model = Skill
     extra = 1
-    fields = ('name', 'logo', 'display_order', 'is_active')
+    fields = ('name', 'logo', 'logo_url', 'display_order', 'is_active')
+
+    class Media:
+        css = {
+            'all': ('admin/css/logo-image-crop.css',)
+        }
+        js = ('admin/js/logo-image-crop.js',)
 
 
 @admin.register(SkillCategory)
@@ -358,37 +372,37 @@ class SkillCategoryAdmin(admin.ModelAdmin):
         }),
     )
 
+    class Media:
+        css = {
+            'all': ('admin/css/logo-image-crop.css',)
+        }
+        js = ('admin/js/logo-image-crop.js',)
+
 
 @admin.register(Skill)
 class SkillAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'display_order', 'is_active', 'updated_at')
+    list_display = ('name', 'category', 'display_order', 'has_custom_logo_url', 'is_active', 'updated_at')
     list_filter = ('category', 'is_active', 'created_at', 'updated_at')
-    search_fields = ('name', 'category__name')
+    search_fields = ('name', 'category__name', 'logo_url')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         ('Skill', {
-            'fields': ('category', 'name', 'logo', 'display_order', 'is_active')
+            'fields': ('category', 'name', 'logo', 'logo_url', 'display_order', 'is_active')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
         }),
     )
 
+    class Media:
+        css = {
+            'all': ('admin/css/logo-image-crop.css',)
+        }
+        js = ('admin/js/logo-image-crop.js',)
 
-@admin.register(ProjectTechnology)
-class ProjectTechnologyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'display_order', 'is_active', 'updated_at')
-    list_filter = ('is_active', 'created_at', 'updated_at')
-    search_fields = ('name',)
-    readonly_fields = ('created_at', 'updated_at')
-    fieldsets = (
-        ('Technology', {
-            'fields': ('name', 'logo', 'display_order', 'is_active')
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-        }),
-    )
+    @admin.display(boolean=True, description='Logo URL')
+    def has_custom_logo_url(self, obj):
+        return bool(obj.logo_url)
 
 
 class ProjectScreenshotInline(admin.TabularInline):
@@ -396,21 +410,37 @@ class ProjectScreenshotInline(admin.TabularInline):
     extra = 1
     fields = ('image', 'caption', 'display_order', 'is_active')
 
+    class Media:
+        css = {
+            'all': ('admin/css/project-image-crop.css',)
+        }
+        js = ('admin/js/project-image-crop.js',)
+
+
+class ProjectSkillInline(admin.TabularInline):
+    model = ProjectSkill
+    extra = 1
+    fields = ('name', 'logo', 'logo_url', 'display_order', 'is_active')
+
+    class Media:
+        css = {
+            'all': ('admin/css/logo-image-crop.css',)
+        }
+        js = ('admin/js/logo-image-crop.js',)
+
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
     list_display = ('name', 'display_order', 'github_link', 'is_active', 'updated_at')
-    list_filter = ('is_active', 'technologies', 'created_at', 'updated_at')
-    search_fields = ('name', 'description', 'github_link', 'technologies__name')
+    list_filter = ('is_active', 'created_at', 'updated_at')
+    search_fields = ('name', 'description', 'github_link', 'project_skills__name')
     readonly_fields = ('created_at', 'updated_at')
-    filter_horizontal = ('technologies',)
-    inlines = (ProjectScreenshotInline,)
+    inlines = (ProjectSkillInline, ProjectScreenshotInline)
     fieldsets = (
         ('Project', {
             'fields': (
                 'name',
                 'cover_image',
-                'technologies',
                 'description',
                 'github_link',
                 'display_order',
@@ -421,6 +451,38 @@ class ProjectAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at'),
         }),
     )
+
+    class Media:
+        css = {
+            'all': ('admin/css/project-image-crop.css',)
+        }
+        js = ('admin/js/project-image-crop.js',)
+
+
+@admin.register(ProjectSkill)
+class ProjectSkillAdmin(admin.ModelAdmin):
+    list_display = ('name', 'project', 'display_order', 'has_custom_logo_url', 'is_active', 'updated_at')
+    list_filter = ('project', 'is_active', 'created_at', 'updated_at')
+    search_fields = ('name', 'project__name', 'logo_url')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Project Skill', {
+            'fields': ('project', 'name', 'logo', 'logo_url', 'display_order', 'is_active')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+        }),
+    )
+
+    class Media:
+        css = {
+            'all': ('admin/css/logo-image-crop.css',)
+        }
+        js = ('admin/js/logo-image-crop.js',)
+
+    @admin.display(boolean=True, description='Logo URL')
+    def has_custom_logo_url(self, obj):
+        return bool(obj.logo_url)
 
 
 @admin.register(ProjectScreenshot)
@@ -437,6 +499,12 @@ class ProjectScreenshotAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at'),
         }),
     )
+
+    class Media:
+        css = {
+            'all': ('admin/css/project-image-crop.css',)
+        }
+        js = ('admin/js/project-image-crop.js',)
 
 
 @admin.register(Education)

@@ -84,12 +84,16 @@ class SocialLink(CommonModel):
 
     name = models.CharField(max_length=30, choices=Platform.choices)
     url = models.CharField(max_length=300, blank=True)
+    display_order = models.PositiveIntegerField(
+        default=0,
+        help_text='Lower numbers display first in profile actions and footer logos.',
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = 'Social Link'
         verbose_name_plural = 'Social Links'
-        ordering = ['name']
+        ordering = ['display_order', 'created_at', 'name']
 
     def __str__(self):
         return self.get_name_display()
@@ -271,6 +275,11 @@ class Skill(CommonModel):
     )
     name = models.CharField(max_length=120)
     logo = models.FileField(upload_to='skills/', blank=True, null=True)
+    logo_url = models.URLField(
+        max_length=500,
+        blank=True,
+        help_text='Optional direct logo URL. Used when no logo file is uploaded.',
+    )
     display_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -293,37 +302,9 @@ class Skill(CommonModel):
         return f'https://cdn.simpleicons.org/{icon_slug}'
 
 
-class ProjectTechnology(CommonModel):
-    SIMPLE_ICON_ALIASES = Skill.SIMPLE_ICON_ALIASES
-
-    name = models.CharField(max_length=120)
-    logo = models.FileField(upload_to='project-technologies/', blank=True, null=True)
-    display_order = models.PositiveIntegerField(default=0)
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        verbose_name = 'Project Technology'
-        verbose_name_plural = 'Project Technologies'
-        ordering = ['display_order', 'name']
-
-    def __str__(self):
-        return self.name
-
-    @property
-    def auto_logo_url(self):
-        normalized_name = self.name.strip().lower()
-        icon_slug = self.SIMPLE_ICON_ALIASES.get(normalized_name)
-
-        if not icon_slug:
-            icon_slug = slugify(normalized_name).replace('-', '')
-
-        return f'https://cdn.simpleicons.org/{icon_slug}'
-
-
 class Project(CommonModel):
     name = models.CharField(max_length=160)
     cover_image = models.FileField(upload_to='projects/covers/', blank=True, null=True)
-    technologies = models.ManyToManyField(ProjectTechnology, blank=True, related_name='projects')
     description = models.TextField(blank=True)
     github_link = models.CharField(max_length=300, blank=True)
     display_order = models.PositiveIntegerField(default=0)
@@ -336,6 +317,43 @@ class Project(CommonModel):
 
     def __str__(self):
         return self.name
+
+
+class ProjectSkill(CommonModel):
+    SIMPLE_ICON_ALIASES = Skill.SIMPLE_ICON_ALIASES
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name='project_skills',
+    )
+    name = models.CharField(max_length=120)
+    logo = models.FileField(upload_to='project-skills/', blank=True, null=True)
+    logo_url = models.URLField(
+        max_length=500,
+        blank=True,
+        help_text='Optional direct logo URL. Used when no logo file is uploaded.',
+    )
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Project Skill'
+        verbose_name_plural = 'Project Skills'
+        ordering = ['display_order', 'name']
+
+    def __str__(self):
+        return f'{self.name} - {self.project.name}'
+
+    @property
+    def auto_logo_url(self):
+        normalized_name = self.name.strip().lower()
+        icon_slug = self.SIMPLE_ICON_ALIASES.get(normalized_name)
+
+        if not icon_slug:
+            icon_slug = slugify(normalized_name).replace('-', '')
+
+        return f'https://cdn.simpleicons.org/{icon_slug}'
 
 
 class ProjectScreenshot(CommonModel):

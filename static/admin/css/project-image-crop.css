@@ -1,0 +1,66 @@
+.project-crop-panel {
+    margin-top: 10px;
+    max-width: 640px;
+    padding: 12px;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background: var(--body-bg, #fff);
+}
+
+.project-crop-panel[hidden] {
+    display: none;
+}
+
+.project-crop-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.project-crop-canvas {
+    width: 320px;
+    height: 180px;
+    max-width: 100%;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    background: #111;
+    cursor: grab;
+    touch-action: none;
+}
+
+.project-crop-canvas:active {
+    cursor: grabbing;
+}
+
+.project-crop-controls {
+    min-width: 220px;
+    flex: 1;
+}
+
+.project-crop-controls label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.project-crop-controls input[type="range"] {
+    width: 100%;
+}
+
+.project-crop-preview {
+    width: 220px;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    margin-top: 12px;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 6px;
+    object-fit: cover;
+    background: #111;
+}
+
+.project-crop-note {
+    margin: 8px 0 0;
+    color: var(--body-quiet-color, #666);
+    font-size: 0.8125rem;
+}
