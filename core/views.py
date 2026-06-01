@@ -35,6 +35,7 @@ from .utils import (
 NOT_ADDED = 'Not Added'
 PROJECT_FALLBACK_IMAGE = 'images/projects/project-01/PROJECT_COVER_IMAGE.jpg'
 SITE_ICON_IMAGE = 'images/share-icon.svg'
+SITE_SHARE_IMAGE = 'images/share-preview.png'
 CONTACT_FIELD_LIMITS = {
     'name': 24,
     'email': 35,
@@ -210,6 +211,10 @@ def build_share_icon_url(request):
     return build_absolute_asset_url(request, SITE_ICON_IMAGE)
 
 
+def build_share_image_url(request):
+    return build_absolute_asset_url(request, SITE_SHARE_IMAGE)
+
+
 def build_share_metadata(request, page_title, description):
     cleaned_description = ' '.join(description.split()) if description else ''
     share_description = (
@@ -218,19 +223,18 @@ def build_share_metadata(request, page_title, description):
         else 'Portfolio website showcasing design engineering work.'
     )
     page_url = request.build_absolute_uri(request.path) if request else ''
-    share_icon_url = build_share_icon_url(request)
 
     return {
         'title': page_title,
         'description': share_description,
         'url': page_url,
         'site_name': page_title,
-        'image': share_icon_url,
-        'image_type': 'image/svg+xml',
-        'image_width': 512,
-        'image_height': 512,
+        'image': build_share_image_url(request),
+        'image_type': 'image/png',
+        'image_width': 1200,
+        'image_height': 630,
         'image_alt': page_title,
-        'icon': share_icon_url,
+        'icon': build_share_icon_url(request),
     }
 
 
