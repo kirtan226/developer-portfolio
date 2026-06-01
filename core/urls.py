@@ -4,12 +4,14 @@ from .views import (
     HomeView,
     contact_submit_api,
     profile_detail_api,
+    share_icon_svg,
     site_visit_duration_api,
     social_links_api,
 )
 
 urlpatterns = [
     path('', HomeView.as_view(), name='home'),
+    path('share-icon.svg', share_icon_svg, name='share_icon_svg'),
     path('api/profile/', profile_detail_api, name='profile_detail_api'),
     path('api/social-links/', social_links_api, name='social_links_api'),
     path('api/contact/submit/', contact_submit_api, name='contact_submit_api'),

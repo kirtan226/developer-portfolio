@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="KP">
+  <defs>
+    <linearGradient id="kpGradient" x1="96" y1="80" x2="416" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7de7ff"/>
+      <stop offset="1" stop-color="#ff867d"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="#090b0d"/>
+  <circle cx="256" cy="256" r="184" fill="none" stroke="url(#kpGradient)" stroke-width="28"/>
+  <text x="256" y="274" text-anchor="middle" dominant-baseline="middle" fill="url(#kpGradient)" font-family="Inter, Arial, sans-serif" font-size="156" font-weight="800" letter-spacing="0">KP</text>
+</svg>

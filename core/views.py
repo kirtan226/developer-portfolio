@@ -1,9 +1,11 @@
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.shortcuts import render
 from django.templatetags.static import static
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import escape
 from django.views import View
 from django.views.decorators.http import require_POST
 from django.db.utils import DatabaseError, OperationalError, ProgrammingError
@@ -32,8 +34,7 @@ from .utils import (
 
 NOT_ADDED = 'Not Added'
 PROJECT_FALLBACK_IMAGE = 'images/projects/project-01/PROJECT_COVER_IMAGE.jpg'
-SITE_ICON_IMAGE = 'images/site-icon.svg'
-SITE_SHARE_IMAGE = 'images/og/home.jpg'
+SITE_ICON_IMAGE = 'images/share-icon.svg'
 CONTACT_FIELD_LIMITS = {
     'name': 24,
     'email': 35,
@@ -202,6 +203,13 @@ def build_absolute_asset_url(request, asset_path):
     return asset_url
 
 
+def build_share_icon_url(request):
+    if request:
+        return request.build_absolute_uri(reverse('share_icon_svg'))
+
+    return build_absolute_asset_url(request, SITE_ICON_IMAGE)
+
+
 def build_share_metadata(request, page_title, description):
     cleaned_description = ' '.join(description.split()) if description else ''
     share_description = (
@@ -210,17 +218,19 @@ def build_share_metadata(request, page_title, description):
         else 'Portfolio website showcasing design engineering work.'
     )
     page_url = request.build_absolute_uri(request.path) if request else ''
+    share_icon_url = build_share_icon_url(request)
 
     return {
         'title': page_title,
         'description': share_description,
         'url': page_url,
         'site_name': page_title,
-        'image': build_absolute_asset_url(request, SITE_SHARE_IMAGE),
-        'image_width': 1920,
-        'image_height': 1200,
+        'image': share_icon_url,
+        'image_type': 'image/svg+xml',
+        'image_width': 512,
+        'image_height': 512,
         'image_alt': page_title,
-        'icon': build_absolute_asset_url(request, SITE_ICON_IMAGE),
+        'icon': share_icon_url,
     }
 
 
@@ -268,6 +278,33 @@ def build_social_links():
         })
 
     return social_links
+
+
+def share_icon_svg(request):
+    profile = get_active_profile()
+    icon_text = (
+        profile.browser_tab_icon_text.strip()
+        if profile and profile.browser_tab_icon_text.strip()
+        else 'KP'
+    )[:4].upper()
+    font_size = 156 if len(icon_text) <= 2 else 116
+    escaped_icon_text = escape(icon_text)
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="{escaped_icon_text}">
+<defs>
+  <linearGradient id="kpGradient" x1="96" y1="80" x2="416" y2="432" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#7de7ff"/>
+    <stop offset="1" stop-color="#ff867d"/>
+  </linearGradient>
+</defs>
+<rect width="512" height="512" rx="128" fill="#090b0d"/>
+<circle cx="256" cy="256" r="184" fill="none" stroke="url(#kpGradient)" stroke-width="28"/>
+<text x="256" y="274" text-anchor="middle" dominant-baseline="middle" fill="url(#kpGradient)" font-family="Inter, Arial, sans-serif" font-size="{font_size}" font-weight="800" letter-spacing="0">{escaped_icon_text}</text>
+</svg>"""
+
+    response = HttpResponse(svg, content_type='image/svg+xml')
+    response['Cache-Control'] = 'public, max-age=3600'
+    return response
 
 
 def format_role_duration(role):
@@ -658,7 +695,7 @@ class HomeView(View):
                 {
                     'name': 'Once UI Design System',
                     'description': 'A customizable design system built for fast, consistent product interfaces.',
-                    'cover_image': image_item('images/projects/project-01/cover-01.jpg', 'Once UI Design System cover image', is_static=True),
+                    'cover_image': image_item(PROJECT_FALLBACK_IMAGE, 'Once UI Design System cover image', is_static=True),
                     'technologies': [
                         {
                             'name': 'Django',
@@ -674,14 +711,14 @@ class HomeView(View):
                     'github_link': '',
                     'site_link': '',
                     'gallery_images': [
-                        image_item('images/projects/project-01/cover-01.jpg', 'Once UI Design System cover image', is_static=True),
+                        image_item(PROJECT_FALLBACK_IMAGE, 'Once UI Design System cover image', is_static=True),
                     ],
                     'has_multiple_images': False,
                 },
                 {
                     'name': 'Figma to Code Pipeline',
                     'description': 'A workflow that automates design handovers and speeds up production builds.',
-                    'cover_image': image_item('images/projects/project-01/cover-02.jpg', 'Figma to Code Pipeline cover image', is_static=True),
+                    'cover_image': image_item(PROJECT_FALLBACK_IMAGE, 'Figma to Code Pipeline cover image', is_static=True),
                     'technologies': [
                         {
                             'name': 'Python',
@@ -697,7 +734,7 @@ class HomeView(View):
                     'github_link': '',
                     'site_link': '',
                     'gallery_images': [
-                        image_item('images/projects/project-01/cover-02.jpg', 'Figma to Code Pipeline cover image', is_static=True),
+                        image_item(PROJECT_FALLBACK_IMAGE, 'Figma to Code Pipeline cover image', is_static=True),
                     ],
                     'has_multiple_images': False,
                 },
