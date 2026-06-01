@@ -35,7 +35,7 @@ from .utils import (
 NOT_ADDED = 'Not Added'
 PROJECT_FALLBACK_IMAGE = 'images/projects/project-01/PROJECT_COVER_IMAGE.jpg'
 SITE_ICON_IMAGE = 'images/share-icon.svg'
-SITE_SHARE_IMAGE = 'images/share-preview.png'
+SITE_SHARE_IMAGE = 'images/share-preview.jpg'
 CONTACT_FIELD_LIMITS = {
     'name': 24,
     'email': 35,
@@ -230,7 +230,7 @@ def build_share_metadata(request, page_title, description):
         'url': page_url,
         'site_name': page_title,
         'image': build_share_image_url(request),
-        'image_type': 'image/png',
+        'image_type': 'image/jpeg',
         'image_width': 1200,
         'image_height': 630,
         'image_alt': page_title,
