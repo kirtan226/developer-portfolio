@@ -426,6 +426,14 @@ h1 {
     line-height: 1.8;
 }
 
+.intro-copy p {
+    margin: 0 0 1.2rem;
+}
+
+.intro-copy p:last-child {
+    margin-bottom: 0;
+}
+
 .project-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
