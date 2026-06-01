@@ -173,10 +173,13 @@ class UserSiteVisitAdmin(admin.ModelAdmin):
         'device_type',
         'visit_count',
         'duration_display',
+        'is_active',
         'first_visited_at',
         'last_visited_at',
     )
+    list_editable = ('is_active',)
     list_filter = (
+        'is_active',
         'browser_name',
         'country',
         'state',
@@ -229,6 +232,7 @@ class UserSiteVisitAdmin(admin.ModelAdmin):
                 'country',
                 'state',
                 'city',
+                'is_active',
             )
         }),
         ('Visit Stats', {

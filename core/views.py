@@ -714,7 +714,8 @@ class HomeView(View):
 
         try:
             site_visit, is_new_visit = record_site_visit(request)
-            send_site_visit_notifications(site_visit, get_active_profile(), is_new_visit)
+            if site_visit.is_active:
+                send_site_visit_notifications(site_visit, get_active_profile(), is_new_visit)
         except (DatabaseError, OperationalError, ProgrammingError):
             site_visit = None
 

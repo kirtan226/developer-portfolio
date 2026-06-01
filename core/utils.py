@@ -17,6 +17,7 @@ from .models import DynamicTemplate, NotificationSetting, UserSiteVisit
 
 OWNER_CONTACT_TEMPLATE_SLUG = 'contact-owner-notification'
 VISITOR_CONFIRMATION_TEMPLATE_SLUG = 'contact-visitor-confirmation'
+SITE_VISIT_TEMPLATE_SLUG = 'site-visit-notification'
 TELEGRAM_TIMEOUT_SECONDS = 10
 TRACKED_DURATION_MAX_SECONDS = 3600
 IP_LOCATION_TIMEOUT_SECONDS = 3
@@ -47,17 +48,28 @@ def build_contact_email_context(contact_submission, profile):
         'profile': profile,
         'site_name': profile.name if profile and profile.name else 'Portfolio',
         'contact_subject': contact_subject,
+        'server': get_server_display(),
     }
 
 
-def render_template_content(slug, context_data, fallback_html):
+def render_template_content(slug, context_data, fallback_html, fallback_title=None):
     dynamic_template = get_dynamic_template(slug)
-    source = dynamic_template.rich_enrichment if dynamic_template else fallback_html
 
-    try:
-        return Template(source).render(Context(context_data))
-    except Exception:
-        return Template(fallback_html).render(Context(context_data))
+    if dynamic_template:
+        try:
+            return Template(dynamic_template.rich_enrichment).render(Context(context_data))
+        except Exception:
+            pass
+
+    fallback_content = Template(fallback_html).render(Context(context_data))
+    if fallback_title:
+        return wrap_email_html(fallback_title, fallback_content)
+
+    return fallback_content
+
+
+def get_server_display():
+    return getattr(settings, 'SERVER_DISPLAY', getattr(settings, 'SERVER', 'local')).upper()
 
 
 def wrap_email_html(title, body_html):
@@ -189,6 +201,10 @@ def record_site_visit(request):
     browser_details = parse_browser_details(user_agent)
     location = get_ip_location(ip_address)
     now = timezone.now()
+    muted_ip_exists = UserSiteVisit.objects.filter(
+        ip_address=ip_address,
+        is_active=False,
+    ).exists()
 
     site_visit, created = UserSiteVisit.objects.get_or_create(
         ip_address=ip_address,
@@ -202,6 +218,7 @@ def record_site_visit(request):
             'country': location['country'],
             'state': location['state'],
             'city': location['city'],
+            'is_active': not muted_ip_exists,
             'first_visited_at': now,
             'last_visited_at': now,
         },
@@ -218,6 +235,8 @@ def record_site_visit(request):
             site_visit.country = location['country']
             site_visit.state = location['state']
             site_visit.city = location['city']
+        if muted_ip_exists and site_visit.is_active:
+            site_visit.is_active = False
         site_visit.visit_count = F('visit_count') + 1
         site_visit.last_visited_at = now
         site_visit.save(update_fields=[
@@ -229,6 +248,7 @@ def record_site_visit(request):
             'country',
             'state',
             'city',
+            'is_active',
             'visit_count',
             'last_visited_at',
             'updated_at',
@@ -300,6 +320,7 @@ def build_contact_telegram_message(contact_submission):
     lines = [
         '🔔 <b>New Contact Message</b>',
         '',
+        f'🖥️ <b>Server:</b> {escape(get_server_display())}',
         f'👤 <b>Name:</b> {escape(contact_submission.name)}',
         f'📧 <b>Email:</b> {escape(contact_submission.email)}',
         f'📝 <b>Subject:</b> {escape(contact_submission.subject)}',
@@ -322,9 +343,11 @@ def build_site_visit_telegram_message(site_visit, is_new_visit):
     visited_at = timezone.localtime(site_visit.last_visited_at).strftime('%d %b %Y, %I:%M %p')
     first_visited_at = timezone.localtime(site_visit.first_visited_at).strftime('%d %b %Y, %I:%M %p')
     status = 'New Visitor' if is_new_visit else 'Returning Visitor'
+    server_display = get_server_display()
     lines = [
         f'👁️ <b>{escape(status)}</b>',
         '',
+        f'🖥️ <b>Server:</b> {escape(server_display)}',
         f'🌐 <b>IP:</b> {escape(site_visit.ip_address)}',
         f'📍 <b>Country:</b> {escape(site_visit.country or "Not available")}',
         f'🏙️ <b>State:</b> {escape(site_visit.state or "Not available")}',
@@ -347,37 +370,100 @@ def build_site_visit_telegram_message(site_visit, is_new_visit):
     return '\n'.join(lines)
 
 
-def build_site_visit_email(site_visit, is_new_visit):
-    status = 'New visitor' if is_new_visit else 'Returning visitor'
+def build_site_visit_email_context(site_visit, is_new_visit):
     visited_at = timezone.localtime(site_visit.last_visited_at).strftime('%d %b %Y, %I:%M %p')
     first_visited_at = timezone.localtime(site_visit.first_visited_at).strftime('%d %b %Y, %I:%M %p')
-    subject = f'{status} on your portfolio'
-    body = f"""
-<p><strong>{escape(status)}</strong> visited your site.</p>
-<p><strong>IP:</strong> {escape(site_visit.ip_address)}<br>
-<strong>Country:</strong> {escape(site_visit.country or 'Not available')}<br>
-<strong>State:</strong> {escape(site_visit.state or 'Not available')}<br>
-<strong>City:</strong> {escape(site_visit.city or 'Not available')}<br>
-<strong>Browser:</strong> {escape(site_visit.browser_name)} {escape(site_visit.browser_version)}<br>
-<strong>OS:</strong> {escape(site_visit.operating_system)}<br>
-<strong>Device:</strong> {escape(site_visit.device_type)}<br>
-<strong>Visit count:</strong> {site_visit.visit_count}<br>
-<strong>Total time:</strong> {escape(format_duration(site_visit.total_duration_seconds))}<br>
-<strong>First visit:</strong> {escape(first_visited_at)}<br>
-<strong>Last visit:</strong> {escape(visited_at)}</p>
-<p><strong>Referrer:</strong> {escape(site_visit.referrer_url or 'Direct visit')}</p>
-<p><strong>User agent:</strong><br>{escape(site_visit.user_agent)}</p>
+    status = 'New visitor' if is_new_visit else 'Returning visitor'
+
+    return {
+        'site_visit': site_visit,
+        'status': status,
+        'server': get_server_display(),
+        'ip_address': site_visit.ip_address,
+        'country': site_visit.country or 'Not available',
+        'state': site_visit.state or 'Not available',
+        'city': site_visit.city or 'Not available',
+        'browser': f'{site_visit.browser_name} {site_visit.browser_version}'.strip(),
+        'operating_system': site_visit.operating_system,
+        'device_type': site_visit.device_type,
+        'visit_count': site_visit.visit_count,
+        'total_time': format_duration(site_visit.total_duration_seconds),
+        'first_visited_at': first_visited_at,
+        'last_visited_at': visited_at,
+        'referrer_url': site_visit.referrer_url or 'Direct visit',
+        'user_agent': site_visit.user_agent,
+    }
+
+
+def build_site_visit_email(site_visit, is_new_visit):
+    context_data = build_site_visit_email_context(site_visit, is_new_visit)
+    subject = f'{context_data["status"]} on your portfolio [{context_data["server"]}]'
+    context_data['title'] = 'Site Visit Notification'
+    fallback = """
+<div style="border:1px solid rgba(255,255,255,0.10);border-radius:12px;background:#101417;padding:18px;margin:0 0 18px;">
+    <div style="font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#89e3c8;margin:0 0 8px;">{{ server }} Server</div>
+    <p style="margin:0;color:#f3f7f8;font-size:18px;line-height:1.4;"><strong>{{ status }}</strong> visited your portfolio.</p>
+</div>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 0 18px;">
+    <tr>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#101417;color:#9fb0b6;width:38%;">IP address</td>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#141a1e;color:#f3f7f8;">{{ ip_address }}</td>
+    </tr>
+    <tr>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#101417;color:#9fb0b6;">Location</td>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#141a1e;color:#f3f7f8;">{{ city }}, {{ state }}, {{ country }}</td>
+    </tr>
+    <tr>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#101417;color:#9fb0b6;">Browser</td>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#141a1e;color:#f3f7f8;">{{ browser }}</td>
+    </tr>
+    <tr>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#101417;color:#9fb0b6;">Device</td>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#141a1e;color:#f3f7f8;">{{ device_type }} / {{ operating_system }}</td>
+    </tr>
+    <tr>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#101417;color:#9fb0b6;">Visits</td>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#141a1e;color:#f3f7f8;">{{ visit_count }} total, {{ total_time }} tracked</td>
+    </tr>
+    <tr>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#101417;color:#9fb0b6;">First visit</td>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#141a1e;color:#f3f7f8;">{{ first_visited_at }}</td>
+    </tr>
+    <tr>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#101417;color:#9fb0b6;">Last visit</td>
+        <td style="padding:12px 14px;border:1px solid rgba(255,255,255,0.10);background:#141a1e;color:#f3f7f8;">{{ last_visited_at }}</td>
+    </tr>
+</table>
+
+<p style="margin:0 0 12px;"><strong>Referrer:</strong> {{ referrer_url }}</p>
+<p style="margin:0;"><strong>User agent:</strong><br>{{ user_agent }}</p>
 """
-    return subject, wrap_email_html('Site Visit Notification', body)
+    body = render_template_content(
+        SITE_VISIT_TEMPLATE_SLUG,
+        context_data,
+        fallback,
+        fallback_title='Site Visit Notification',
+    )
+    return subject, body
 
 
 def build_contact_email_bodies(contact_submission, profile):
     context_data = build_contact_email_context(contact_submission, profile)
     owner_subject = f'New contact message: {context_data["contact_subject"]}'
     visitor_subject = f'Thank you for reaching out to {context_data["site_name"]}'
+    owner_context = {
+        **context_data,
+        'title': 'New Contact Message',
+    }
+    visitor_context = {
+        **context_data,
+        'title': 'Thank You For Reaching Out',
+    }
     owner_fallback = """
 <p>You received a new contact message from <strong>{{ contact.name }}</strong>.</p>
-<p><strong>Email:</strong> {{ contact.email }}<br>
+<p><strong>Server:</strong> {{ server }}<br>
+<strong>Email:</strong> {{ contact.email }}<br>
 <strong>Subject:</strong> {{ contact_subject }}</p>
 <p><strong>Message</strong></p>
 <p>{{ contact.message|linebreaksbr }}</p>
@@ -391,13 +477,17 @@ def build_contact_email_bodies(contact_submission, profile):
 <p>{{ contact.message|linebreaksbr }}</p>
 """
 
-    owner_html = wrap_email_html(
-        'New Contact Message',
-        render_template_content(OWNER_CONTACT_TEMPLATE_SLUG, context_data, owner_fallback),
+    owner_html = render_template_content(
+        OWNER_CONTACT_TEMPLATE_SLUG,
+        owner_context,
+        owner_fallback,
+        fallback_title='New Contact Message',
     )
-    visitor_html = wrap_email_html(
-        'Thank You For Reaching Out',
-        render_template_content(VISITOR_CONFIRMATION_TEMPLATE_SLUG, context_data, visitor_fallback),
+    visitor_html = render_template_content(
+        VISITOR_CONFIRMATION_TEMPLATE_SLUG,
+        visitor_context,
+        visitor_fallback,
+        fallback_title='Thank You For Reaching Out',
     )
     return owner_subject, owner_html, visitor_subject, visitor_html
 

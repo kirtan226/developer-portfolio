@@ -158,6 +158,10 @@ class UserSiteVisit(CommonModel):
     city = models.CharField(max_length=120, blank=True)
     visit_count = models.PositiveIntegerField(default=1)
     total_duration_seconds = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Disable to stop site visit notifications for this IP address.',
+    )
     first_visited_at = models.DateTimeField(default=timezone.now)
     last_visited_at = models.DateTimeField()
 

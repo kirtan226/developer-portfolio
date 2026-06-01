@@ -104,7 +104,8 @@ WSGI_APPLICATION = 'developer_portfolio.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-SERVER = os.environ.get('SERVER', 'local').strip().lower()
+SERVER = os.environ.get('SERVER', 'local').split('#', 1)[0].strip().lower()
+SERVER_DISPLAY = SERVER.upper()
 
 if SERVER == 'live':
     DATABASES = {
