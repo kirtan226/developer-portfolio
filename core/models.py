@@ -311,6 +311,7 @@ class Project(CommonModel):
     cover_image = models.FileField(upload_to='projects/covers/', blank=True, null=True)
     description = models.TextField(blank=True)
     github_link = models.CharField(max_length=300, blank=True)
+    site_link = models.URLField(max_length=300, blank=True)
     display_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 

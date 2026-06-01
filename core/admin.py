@@ -533,9 +533,9 @@ class ProjectSkillInline(admin.TabularInline):
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
     form = ProjectAdminForm
-    list_display = ('name', 'display_order', 'github_link', 'is_active', 'updated_at')
+    list_display = ('name', 'display_order', 'github_link', 'site_link', 'is_active', 'updated_at')
     list_filter = ('is_active', 'created_at', 'updated_at')
-    search_fields = ('name', 'description', 'github_link', 'project_skills__name')
+    search_fields = ('name', 'description', 'github_link', 'site_link', 'project_skills__name')
     readonly_fields = ('created_at', 'updated_at')
     inlines = (ProjectSkillInline, ProjectScreenshotInline)
     fieldsets = (
@@ -545,6 +545,7 @@ class ProjectAdmin(admin.ModelAdmin):
                 'cover_image',
                 'description',
                 'github_link',
+                'site_link',
                 'display_order',
                 'is_active',
             )

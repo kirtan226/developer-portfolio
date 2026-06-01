@@ -468,6 +468,7 @@ def build_projects():
             'description_points': description_points,
             'description_paragraphs': description_paragraphs,
             'github_link': project.github_link.strip(),
+            'site_link': project.site_link.strip(),
             'gallery_images': gallery_images,
             'has_multiple_images': len(gallery_images) > 1,
         })
@@ -671,6 +672,7 @@ class HomeView(View):
                         },
                     ],
                     'github_link': '',
+                    'site_link': '',
                     'gallery_images': [
                         image_item('images/projects/project-01/cover-01.jpg', 'Once UI Design System cover image', is_static=True),
                     ],
@@ -693,6 +695,7 @@ class HomeView(View):
                         },
                     ],
                     'github_link': '',
+                    'site_link': '',
                     'gallery_images': [
                         image_item('images/projects/project-01/cover-02.jpg', 'Figma to Code Pipeline cover image', is_static=True),
                     ],

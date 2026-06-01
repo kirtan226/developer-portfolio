@@ -418,6 +418,12 @@
                     <span>GitHub</span>
                 </a>
                 {% endif %}
+                {% if project.site_link %}
+                <a class="project-link-button" href="{{ project.site_link }}" target="_blank" rel="noopener">
+                    <i class="bi bi-globe2"></i>
+                    <span>Visit Site</span>
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
