@@ -11,7 +11,12 @@
     function isLogoInput(input) {
         return input
             && input.type === "file"
-            && (input.name === "logo" || input.name.endsWith("-logo"));
+            && (
+                input.name === "logo"
+                || input.name === "company_logo"
+                || input.name.endsWith("-logo")
+                || input.name.endsWith("-company_logo")
+            );
     }
 
     function createCropper(input) {

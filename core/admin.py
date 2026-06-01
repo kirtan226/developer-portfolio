@@ -311,6 +311,12 @@ class CompanyAdmin(admin.ModelAdmin):
         }),
     )
 
+    class Media:
+        css = {
+            'all': ('admin/css/logo-image-crop.css',)
+        }
+        js = ('admin/js/logo-image-crop.js',)
+
 
 @admin.register(ExperienceRole)
 class ExperienceRoleAdmin(admin.ModelAdmin):
