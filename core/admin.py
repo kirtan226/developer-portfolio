@@ -1,4 +1,9 @@
+import base64
+import uuid
+
 from django.contrib import admin
+from django import forms
+from django.core.files.base import ContentFile
 
 from .models import (
     Company,
@@ -16,6 +21,87 @@ from .models import (
     SocialLink,
     UserSiteVisit,
 )
+
+
+class CroppedImageAdminFormMixin:
+    cropped_image_fields = {}
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        for field_name, options in self.cropped_image_fields.items():
+            prefixed_name = self.add_prefix(field_name)
+            cropped_value = self.data.get(f'__cropped_image__{prefixed_name}', '')
+
+            if not cropped_value or ';base64,' not in cropped_value:
+                continue
+
+            header, encoded = cropped_value.split(';base64,', 1)
+            try:
+                file_data = base64.b64decode(encoded)
+            except (TypeError, ValueError):
+                continue
+
+            extension = options.get('extension', 'png')
+            prefix = options.get('prefix', field_name.replace('_', '-'))
+            filename = f'{prefix}-{uuid.uuid4().hex[:12]}.{extension}'
+            getattr(instance, field_name).save(filename, ContentFile(file_data), save=False)
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+
+        return instance
+
+
+class CompanyAdminForm(CroppedImageAdminFormMixin, forms.ModelForm):
+    cropped_image_fields = {
+        'company_logo': {'prefix': 'company-logo', 'extension': 'png'},
+    }
+
+    class Meta:
+        model = Company
+        fields = '__all__'
+
+
+class SkillAdminForm(CroppedImageAdminFormMixin, forms.ModelForm):
+    cropped_image_fields = {
+        'logo': {'prefix': 'skill-logo', 'extension': 'png'},
+    }
+
+    class Meta:
+        model = Skill
+        fields = '__all__'
+
+
+class ProjectAdminForm(CroppedImageAdminFormMixin, forms.ModelForm):
+    cropped_image_fields = {
+        'cover_image': {'prefix': 'project-cover', 'extension': 'jpg'},
+    }
+
+    class Meta:
+        model = Project
+        fields = '__all__'
+
+
+class ProjectSkillAdminForm(CroppedImageAdminFormMixin, forms.ModelForm):
+    cropped_image_fields = {
+        'logo': {'prefix': 'project-skill-logo', 'extension': 'png'},
+    }
+
+    class Meta:
+        model = ProjectSkill
+        fields = '__all__'
+
+
+class ProjectScreenshotAdminForm(CroppedImageAdminFormMixin, forms.ModelForm):
+    cropped_image_fields = {
+        'image': {'prefix': 'project-screenshot', 'extension': 'jpg'},
+    }
+
+    class Meta:
+        model = ProjectScreenshot
+        fields = '__all__'
 
 
 @admin.register(ProfileDetail)
@@ -291,6 +377,7 @@ class ExperienceRoleInline(admin.StackedInline):
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
+    form = CompanyAdminForm
     list_display = ('name', 'display_logo', 'display_order', 'is_active', 'updated_at')
     list_filter = ('display_logo', 'is_active', 'created_at', 'updated_at')
     search_fields = ('name', 'roles__role', 'roles__description')
@@ -356,6 +443,7 @@ class ExperienceRoleAdmin(admin.ModelAdmin):
 
 class SkillInline(admin.TabularInline):
     model = Skill
+    form = SkillAdminForm
     extra = 1
     fields = ('name', 'logo', 'logo_url', 'display_order', 'is_active')
 
@@ -391,6 +479,7 @@ class SkillCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Skill)
 class SkillAdmin(admin.ModelAdmin):
+    form = SkillAdminForm
     list_display = ('name', 'category', 'display_order', 'has_custom_logo_url', 'is_active', 'updated_at')
     list_filter = ('category', 'is_active', 'created_at', 'updated_at')
     search_fields = ('name', 'category__name', 'logo_url')
@@ -417,6 +506,7 @@ class SkillAdmin(admin.ModelAdmin):
 
 class ProjectScreenshotInline(admin.TabularInline):
     model = ProjectScreenshot
+    form = ProjectScreenshotAdminForm
     extra = 1
     fields = ('image', 'caption', 'display_order', 'is_active')
 
@@ -429,6 +519,7 @@ class ProjectScreenshotInline(admin.TabularInline):
 
 class ProjectSkillInline(admin.TabularInline):
     model = ProjectSkill
+    form = ProjectSkillAdminForm
     extra = 1
     fields = ('name', 'logo', 'logo_url', 'display_order', 'is_active')
 
@@ -441,6 +532,7 @@ class ProjectSkillInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
+    form = ProjectAdminForm
     list_display = ('name', 'display_order', 'github_link', 'is_active', 'updated_at')
     list_filter = ('is_active', 'created_at', 'updated_at')
     search_fields = ('name', 'description', 'github_link', 'project_skills__name')
@@ -471,6 +563,7 @@ class ProjectAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectSkill)
 class ProjectSkillAdmin(admin.ModelAdmin):
+    form = ProjectSkillAdminForm
     list_display = ('name', 'project', 'display_order', 'has_custom_logo_url', 'is_active', 'updated_at')
     list_filter = ('project', 'is_active', 'created_at', 'updated_at')
     search_fields = ('name', 'project__name', 'logo_url')
@@ -497,6 +590,7 @@ class ProjectSkillAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectScreenshot)
 class ProjectScreenshotAdmin(admin.ModelAdmin):
+    form = ProjectScreenshotAdminForm
     list_display = ('project', 'caption', 'display_order', 'is_active', 'updated_at')
     list_filter = ('project', 'is_active', 'created_at', 'updated_at')
     search_fields = ('project__name', 'caption')

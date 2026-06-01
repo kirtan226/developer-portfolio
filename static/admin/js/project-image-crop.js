@@ -47,7 +47,12 @@
             '</div>'
         ].join("");
 
-        input.insertAdjacentElement("afterend", panel);
+        const croppedData = document.createElement("input");
+        croppedData.type = "hidden";
+        croppedData.name = "__cropped_image__" + input.name;
+
+        input.insertAdjacentElement("afterend", croppedData);
+        croppedData.insertAdjacentElement("afterend", panel);
 
         const canvas = panel.querySelector(".project-crop-canvas");
         const zoom = panel.querySelector('input[type="range"]');
@@ -110,6 +115,7 @@
                 panel.hidden = true;
                 state.image = null;
                 state.needsCrop = false;
+                croppedData.value = "";
                 return;
             }
 
@@ -201,8 +207,10 @@
                     output.width = OUTPUT_WIDTH;
                     output.height = OUTPUT_HEIGHT;
                     draw(output, OUTPUT_WIDTH, OUTPUT_HEIGHT);
+                    croppedData.value = output.toDataURL("image/jpeg", 0.9);
                     output.toBlob(function (blob) {
                         if (!blob || typeof DataTransfer === "undefined") {
+                            state.needsCrop = false;
                             resolve();
                             return;
                         }
@@ -223,12 +231,14 @@
 
     function initProjectCroppers() {
         const croppers = [];
+        const boundForms = new WeakSet();
 
         function scan(root) {
             if (isProjectImageInput(root)) {
                 const cropper = createCropper(root);
                 if (cropper) {
                     croppers.push(cropper);
+                    bindForm(cropper.input.closest("form"));
                 }
             }
 
@@ -236,7 +246,50 @@
                 const cropper = createCropper(input);
                 if (cropper) {
                     croppers.push(cropper);
+                    bindForm(cropper.input.closest("form"));
                 }
+            });
+        }
+
+        function bindForm(form) {
+            if (!form || boundForms.has(form)) {
+                return;
+            }
+
+            boundForms.add(form);
+            let submitter = null;
+
+            form.addEventListener("click", function (event) {
+                const button = event.target.closest('input[type="submit"], button[type="submit"]');
+                if (button) {
+                    submitter = button;
+                }
+            });
+
+            form.addEventListener("submit", function (event) {
+                const pending = croppers.filter(function (cropper) {
+                    return cropper.input.closest("form") === form && cropper.state.needsCrop;
+                });
+
+                if (!pending.length || form.dataset.projectCropDone === "1") {
+                    return;
+                }
+
+                event.preventDefault();
+                Promise.all(pending.map(function (cropper) {
+                    return cropper.crop();
+                })).then(function () {
+                    if (submitter && submitter.name) {
+                        const hiddenSubmit = document.createElement("input");
+                        hiddenSubmit.type = "hidden";
+                        hiddenSubmit.name = submitter.name;
+                        hiddenSubmit.value = submitter.value || "1";
+                        form.appendChild(hiddenSubmit);
+                    }
+
+                    form.dataset.projectCropDone = "1";
+                    form.submit();
+                });
             });
         }
 
@@ -253,44 +306,6 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        const form = document.querySelector("form");
-        if (!form) {
-            return;
-        }
-
-        let submitter = null;
-        form.addEventListener("click", function (event) {
-            const button = event.target.closest('input[type="submit"], button[type="submit"]');
-            if (button) {
-                submitter = button;
-            }
-        });
-
-        form.addEventListener("submit", function (event) {
-            const pending = croppers.filter(function (cropper) {
-                return cropper.state.needsCrop;
-            });
-
-            if (!pending.length || form.dataset.projectCropDone === "1") {
-                return;
-            }
-
-            event.preventDefault();
-            Promise.all(pending.map(function (cropper) {
-                return cropper.crop();
-            })).then(function () {
-                if (submitter && submitter.name) {
-                    const hiddenSubmit = document.createElement("input");
-                    hiddenSubmit.type = "hidden";
-                    hiddenSubmit.name = submitter.name;
-                    hiddenSubmit.value = submitter.value || "1";
-                    form.appendChild(hiddenSubmit);
-                }
-
-                form.dataset.projectCropDone = "1";
-                form.submit();
-            });
-        });
     }
 
     if (document.readyState === "loading") {
