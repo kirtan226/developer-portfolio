@@ -992,7 +992,7 @@ li {
 .project-carousel img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     border: 1px solid var(--border);
     border-radius: 1rem;
     background: var(--surface-soft);

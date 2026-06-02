@@ -20,6 +20,10 @@
             );
     }
 
+    function shouldPreserveOriginalByDefault(input) {
+        return input.name !== "cover_image";
+    }
+
     function createCropper(input) {
         if (
             !isProjectImageInput(input)
@@ -41,8 +45,12 @@
             '<div class="project-crop-controls">',
             '<label>Zoom</label>',
             '<input type="range" min="1" max="3" step="0.01" value="1">',
+            '<label class="project-crop-original-option">',
+            '<input type="checkbox" class="project-crop-original">',
+            '<span>Save full original image instead of 16:9 crop</span>',
+            '</label>',
             '<img class="project-crop-preview" alt="Project image preview">',
-            '<p class="project-crop-note">Drag and zoom the image. The saved file is cropped to 16:9 for project cards and the detail carousel.</p>',
+            '<p class="project-crop-note">For cover images, keep the 16:9 crop. For screenshots, save the full original image when you do not want the sides cut off.</p>',
             '</div>',
             '</div>'
         ].join("");
@@ -56,7 +64,9 @@
 
         const canvas = panel.querySelector(".project-crop-canvas");
         const zoom = panel.querySelector('input[type="range"]');
+        const preserveOriginal = panel.querySelector(".project-crop-original");
         const preview = panel.querySelector(".project-crop-preview");
+        preserveOriginal.checked = shouldPreserveOriginalByDefault(input);
         const state = {
             image: null,
             scale: 1,
@@ -199,6 +209,13 @@
             crop: function () {
                 return new Promise(function (resolve) {
                     if (!state.image || !state.needsCrop) {
+                        resolve();
+                        return;
+                    }
+
+                    if (preserveOriginal.checked) {
+                        croppedData.value = "";
+                        state.needsCrop = false;
                         resolve();
                         return;
                     }

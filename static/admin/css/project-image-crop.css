@@ -48,6 +48,18 @@
     width: 100%;
 }
 
+.project-crop-original-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 10px;
+    font-weight: 400;
+}
+
+.project-crop-original-option input {
+    margin-top: 3px;
+}
+
 .project-crop-preview {
     width: 220px;
     max-width: 100%;
