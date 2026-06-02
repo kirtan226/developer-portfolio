@@ -904,6 +904,8 @@ def page_not_found(request, exception=None):
         'social_links': build_social_links(),
         'current_year': timezone.now().year,
         'page_title': page_title,
+        'hide_site_header': True,
+        'hide_site_footer': True,
         'share_metadata': build_share_metadata(request, page_title, 'Page not found.'),
         'browser_tab_config': build_browser_tab_config(profile, page_title),
     }

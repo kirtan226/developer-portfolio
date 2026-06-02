@@ -1070,40 +1070,43 @@ li {
     position: relative;
     z-index: 1;
     display: grid;
-    min-height: calc(100vh - 12rem);
+    min-height: 100%;
     place-items: center;
     padding: 4rem 1rem;
 }
 
 .not-found-panel {
-    width: min(100%, 42rem);
+    width: min(100%, 52rem);
     text-align: center;
 }
 
 .not-found-code {
     display: inline-flex;
-    min-height: 2.35rem;
+    min-height: 3.4rem;
     align-items: center;
     justify-content: center;
-    margin-bottom: 1.25rem;
-    padding: 0 0.95rem;
+    margin-bottom: 1.5rem;
+    padding: 0 1.35rem;
     border: 1px solid var(--border-strong);
     border-radius: 999px;
     background: var(--brand-soft);
     color: var(--brand);
-    font-size: 0.95rem;
+    font-size: clamp(2rem, 7vw, 5.25rem);
     font-weight: 740;
+    line-height: 1;
 }
 
 .not-found-panel h1 {
     margin-bottom: 1rem;
+    font-size: clamp(2.75rem, 8vw, 6rem);
+    line-height: 0.98;
 }
 
 .not-found-panel p {
-    max-width: 32rem;
-    margin: 0 auto 1.5rem;
+    max-width: 40rem;
+    margin: 0 auto 2rem;
     color: var(--muted);
-    font-size: 1.05rem;
+    font-size: clamp(1.15rem, 2.5vw, 1.45rem);
     line-height: 1.7;
 }
 
