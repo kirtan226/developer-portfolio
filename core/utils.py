@@ -52,12 +52,26 @@ def build_contact_email_context(contact_submission, profile):
     }
 
 
+def normalize_template_tag_entities(template_source):
+    def decode_tag(match):
+        return (
+            match.group(0)
+            .replace('&quot;', '"')
+            .replace('&#34;', '"')
+            .replace('&#x27;', "'")
+            .replace('&#39;', "'")
+        )
+
+    return re.sub(r'({[{%].*?[}%]})', decode_tag, template_source, flags=re.DOTALL)
+
+
 def render_template_content(slug, context_data, fallback_html, fallback_title=None):
     dynamic_template = get_dynamic_template(slug)
 
     if dynamic_template:
         try:
-            return Template(dynamic_template.rich_enrichment).render(Context(context_data))
+            template_source = normalize_template_tag_entities(dynamic_template.rich_enrichment)
+            return Template(template_source).render(Context(context_data))
         except Exception:
             pass
 
