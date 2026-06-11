@@ -106,15 +106,16 @@ class ProjectScreenshotAdminForm(CroppedImageAdminFormMixin, forms.ModelForm):
 
 @admin.register(ProfileDetail)
 class ProfileDetailAdmin(admin.ModelAdmin):
-    list_display = ('name', 'role', 'email', 'phone_number', 'location_display', 'is_active', 'updated_at')
+    list_display = ('name', 'primary_role', 'email', 'phone_number', 'location_display', 'is_active', 'updated_at')
     list_filter = ('is_active', 'created_at', 'updated_at')
-    search_fields = ('name', 'role', 'email', 'phone_number', 'city', 'state', 'country')
+    search_fields = ('name', 'email', 'phone_number', 'city', 'state', 'country')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         ('Profile', {
             'fields': (
                 'name',
-                'role',
+                'roles',
+                'role_display_duration_ms',
                 'email',
                 'phone_number',
                 'about_description',
@@ -146,6 +147,15 @@ class ProfileDetailAdmin(admin.ModelAdmin):
             'all': ('admin/css/profile-image-crop.css',)
         }
         js = ('admin/js/profile-image-crop.js',)
+
+    @admin.display(description='Primary role')
+    def primary_role(self, obj):
+        try:
+            if isinstance(obj.roles, (list, tuple)) and obj.roles:
+                return obj.roles[0]
+        except Exception:
+            pass
+        return ''
 
     @admin.display(description='Location')
     def location_display(self, obj):

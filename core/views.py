@@ -11,6 +11,8 @@ from django.views.decorators.http import require_POST
 from django.db.utils import DatabaseError, OperationalError, ProgrammingError
 from django.db.models import Prefetch
 
+import json
+
 from .models import (
     Company,
     ContactSubmission,
@@ -151,6 +153,33 @@ def normalize_languages(value):
         return [item.strip() for item in value.split(',') if item.strip()]
 
     return []
+
+
+def normalize_roles(value):
+    """Accept a list or a JSON/string with separators and return list of role strings."""
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    if isinstance(value, str) and value.strip():
+        s = value.strip()
+        # try parse JSON list
+        if (s.startswith('[') and s.endswith(']')):
+            try:
+                parsed = json.loads(s)
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+            except Exception:
+                pass
+
+        # fallback: split on common separators
+        return [item.strip() for item in re_split_roles(s) if item.strip()]
+
+    return []
+
+
+def re_split_roles(s):
+    import re
+    return re.split(r'[,;|\\n]+', s)
 
 
 def format_location(profile):
@@ -563,7 +592,22 @@ class HomeView(View):
         profile = get_active_profile()
         profile_languages = normalize_languages(profile.languages) if profile else []
         name = profile.name.strip() if profile and profile.name.strip() else f'Name: {NOT_ADDED}'
-        role = profile.role.strip() if profile and profile.role.strip() else f'Role: {NOT_ADDED}'
+        # Normalize roles list (new JSONField or list). If not present, fallback to NOT_ADDED.
+        roles_list = normalize_roles(profile.roles) if profile else []
+        if not roles_list:
+            roles_list = [f'Role: {NOT_ADDED}']
+
+        # Single role string for legacy template compatibility
+        role = roles_list[0]
+
+        # role display duration in ms (how long after fully typed to pause before erasing)
+        role_display_duration = profile.role_display_duration_ms if profile and getattr(profile, 'role_display_duration_ms', None) is not None else 1400
+        try:
+            role_display_duration = int(role_display_duration)
+            if role_display_duration < 0:
+                role_display_duration = 1400
+        except Exception:
+            role_display_duration = 1400
         location = format_location(profile)
         about_description = (
             profile.about_description.strip()
@@ -575,6 +619,10 @@ class HomeView(View):
             'name': name,
             'first_name': name.split()[0] if name and NOT_ADDED not in name else NOT_ADDED,
             'role': role,
+            # Include roles array and JSON for frontend use
+            'roles': roles_list,
+            'roles_json': json.dumps(roles_list),
+            'role_display_duration_ms': role_display_duration,
             'footer_text': (
                 profile.footer_text.strip()
                 if profile and profile.footer_text.strip()

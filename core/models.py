@@ -30,12 +30,25 @@ class CommonModel(models.Model):
 
 class ProfileDetail(CommonModel):
     name = models.CharField(max_length=120, blank=True)
-    role = models.CharField(max_length=160, blank=True)
     email = models.EmailField(blank=True)
     phone_number = models.CharField(max_length=30, blank=True)
     about_description = models.TextField(blank=True)
     footer_text = models.CharField(max_length=160, blank=True)
     languages = models.JSONField(default=list, blank=True)
+
+    # Single source-of-truth for roles: list of strings. Example: ["Python Developer", "Backend Developer"].
+    roles = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of role strings, for example ["Python Developer", "Backend Developer"].',
+    )
+
+    # Control how long a fully-typed role stays visible (in milliseconds) before erasing.
+    role_display_duration_ms = models.PositiveIntegerField(
+        default=1400,
+        help_text='How long (ms) a typed role remains visible before starting to erase. Higher means longer pause.',
+    )
+
     city = models.CharField(max_length=80, blank=True)
     state = models.CharField(max_length=80, blank=True)
     country = models.CharField(max_length=80, blank=True)

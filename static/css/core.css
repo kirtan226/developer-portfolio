@@ -1399,6 +1399,26 @@ li {
     transition: color 180ms ease, background 180ms ease;
 }
 
+/* Typing effect styles for hero role */
+.hero-section .role {
+   font-weight: 500;
+   color: var(--brand);
+}
+.hero-section .role .typed {
+   white-space: nowrap;
+}
+.hero-section .role .cursor {
+   display: inline-block;
+   margin-left: 0.25rem;
+   width: 0.7ch;
+   animation: blink-caret 1s steps(1) infinite;
+   color: var(--brand);
+}
+@keyframes blink-caret {
+   50% { opacity: 0; }
+}
+
+
 .footer-social a:hover {
     color: var(--text);
     background: var(--surface-soft);

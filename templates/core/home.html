@@ -44,7 +44,9 @@
                     {% endcomment %}
 
                     <h1>{{ person.name }}</h1>
-                    <p class="role">{{ person.role }}</p>
+                    <p class="role" data-roles='{{ person.roles_json|safe }}' data-role-duration='{{ person.role_display_duration_ms }}'>
+                        <span class="typed"></span><span class="cursor" aria-hidden="true">|</span>
+                    </p>
 
                     {% if social_links %}
                     <div class="social-actions">

@@ -155,6 +155,71 @@
         revealObserver.observe(node);
     });
 
+    /* Typing animation for hero role */
+    function startRoleTyping() {
+        if (reduceMotion) return;
+        const roleWrapper = document.querySelector('.hero-section .role');
+        if (!roleWrapper) return;
+
+        const raw = roleWrapper.dataset.roles || roleWrapper.textContent || '';
+        let phrases = [];
+
+        try {
+            const trimmed = String(raw).trim();
+            if (trimmed.startsWith('[')) {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) phrases = parsed.map(s => String(s).trim()).filter(Boolean);
+            }
+        } catch (e) {}
+
+        if (!phrases.length) {
+            // fallback: split on common separators
+            phrases = String(raw).split(/[,;|\n]+/).map(s => s.trim()).filter(Boolean);
+        }
+
+        if (!phrases.length) phrases = [String(raw).trim()];
+
+        const typed = roleWrapper.querySelector('.typed') || roleWrapper;
+        const cursor = roleWrapper.querySelector('.cursor');
+
+        const pauseAfterFull = parseInt(roleWrapper.dataset.roleDuration, 10) || 1400;
+
+        let index = 0;
+        let charIndex = 0;
+        let deleting = false;
+
+        function tick() {
+            const current = phrases[index % phrases.length] || '';
+            if (!deleting) {
+                charIndex++;
+                typed.textContent = current.slice(0, charIndex);
+                if (charIndex >= current.length) {
+                    deleting = true;
+                    setTimeout(tick, pauseAfterFull);
+                } else {
+                    setTimeout(tick, 80);
+                }
+            } else {
+                charIndex--;
+                typed.textContent = current.slice(0, charIndex);
+                if (charIndex <= 0) {
+                    deleting = false;
+                    index++;
+                    setTimeout(tick, 500);
+                } else {
+                    setTimeout(tick, 40);
+                }
+            }
+        }
+
+        // initialize
+        typed.textContent = '';
+        if (cursor) cursor.style.visibility = 'visible';
+        tick();
+    }
+
+    startRoleTyping();
+
     const sectionLinks = Array.from(document.querySelectorAll(".nav-cluster .nav-link[href^='#']"));
     const sections = sectionLinks
         .map(function (link) {
