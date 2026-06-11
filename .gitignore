@@ -225,3 +225,5 @@ Thumbs.db
 staticfiles/
 media/
 
+db_backup_*.sqlite3
+backups/
