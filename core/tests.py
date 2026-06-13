@@ -1,9 +1,11 @@
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from unittest.mock import patch
 
-from .models import ContactSubmission, NotificationSetting, UserSiteVisit
+from .cache_keys import HOME_CONTEXT_CACHE_KEY
+from .models import ContactSubmission, NotificationSetting, SocialLink, UserSiteVisit
 from .utils import send_contact_notifications, send_site_visit_notifications
 
 
@@ -140,3 +142,26 @@ class SiteVisitNotifyApiTests(TestCase):
             'telegram_sent': False,
         })
         send_notifications_mock.assert_not_called()
+
+
+class HomeContextCacheInvalidationTests(TestCase):
+    def test_portfolio_model_save_clears_home_context_cache(self):
+        cache.set(HOME_CONTEXT_CACHE_KEY, {'cached': True}, timeout=86400)
+
+        SocialLink.objects.create(
+            name=SocialLink.Platform.GITHUB,
+            url='https://github.com/example',
+        )
+
+        self.assertIsNone(cache.get(HOME_CONTEXT_CACHE_KEY))
+
+    def test_unrelated_model_save_keeps_home_context_cache(self):
+        cache.set(HOME_CONTEXT_CACHE_KEY, {'cached': True}, timeout=86400)
+
+        ContactSubmission.objects.create(
+            name='Visitor',
+            email='visitor@example.com',
+            message='Hello',
+        )
+
+        self.assertEqual(cache.get(HOME_CONTEXT_CACHE_KEY), {'cached': True})

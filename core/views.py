@@ -17,6 +17,7 @@ from copy import deepcopy
 
 from django.conf import settings
 
+from .cache_keys import HOME_CONTEXT_CACHE_KEY
 from .models import (
     Company,
     ContactSubmission,
@@ -591,7 +592,7 @@ def validate_contact_form_data(contact_form):
 
 class HomeView(View):
     template_name = 'core/home.html'
-    context_cache_key = 'core.home_context.v1'
+    context_cache_key = HOME_CONTEXT_CACHE_KEY
 
     def build_context(self, request=None, contact_status=None, contact_form=None, contact_errors=None):
         profile = get_active_profile()
