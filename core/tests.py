@@ -1,3 +1,39 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.urls import reverse
+from django.utils import timezone
 
-# Create your tests here.
+from .models import UserSiteVisit
+
+
+class SiteVisitDurationApiTests(TestCase):
+    def setUp(self):
+        self.site_visit = UserSiteVisit.objects.create(
+            ip_address='203.0.113.10',
+            browser_name='Chrome',
+            last_visited_at=timezone.now(),
+        )
+
+    @override_settings(TRACK_SITE_VISIT_DURATION=True)
+    def test_updates_duration_when_enabled(self):
+        response = self.client.post(reverse('site_visit_duration_api'), {
+            'site_visit_id': self.site_visit.id,
+            'duration_seconds': 15,
+        })
+
+        self.site_visit.refresh_from_db()
+        self.assertJSONEqual(response.content, {'ok': True})
+        self.assertEqual(self.site_visit.total_duration_seconds, 15)
+
+    @override_settings(TRACK_SITE_VISIT_DURATION=False)
+    def test_does_not_update_duration_when_disabled(self):
+        response = self.client.post(reverse('site_visit_duration_api'), {
+            'site_visit_id': self.site_visit.id,
+            'duration_seconds': 15,
+        })
+
+        self.site_visit.refresh_from_db()
+        self.assertJSONEqual(response.content, {
+            'ok': False,
+            'tracking_enabled': False,
+        })
+        self.assertEqual(self.site_visit.total_duration_seconds, 0)

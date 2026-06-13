@@ -13,6 +13,8 @@ from django.db.models import Prefetch
 
 import json
 
+from django.conf import settings
+
 from .models import (
     Company,
     ContactSubmission,
@@ -813,6 +815,7 @@ class HomeView(View):
 
         context = self.build_context(request=request)
         context['site_visit'] = site_visit
+        context['track_site_visit_duration'] = settings.TRACK_SITE_VISIT_DURATION
         return render(request, self.template_name, context)
 
 
@@ -875,6 +878,12 @@ def contact_submit_api(request):
 
 @require_POST
 def site_visit_duration_api(request):
+    if not settings.TRACK_SITE_VISIT_DURATION:
+        return JsonResponse({
+            'ok': False,
+            'tracking_enabled': False,
+        })
+
     site_visit_id = request.POST.get('site_visit_id')
     duration_seconds = request.POST.get('duration_seconds')
     updated = add_site_visit_duration(site_visit_id, duration_seconds)

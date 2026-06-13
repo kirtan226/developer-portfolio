@@ -44,6 +44,7 @@ def env_list(name, default=''):
 DEBUG = env_bool('DEBUG', False)
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', '127.0.0.1,localhost')
+TRACK_SITE_VISIT_DURATION = env_bool('TRACK_SITE_VISIT_DURATION', False)
 
 
 def normalize_url_path(value, default):

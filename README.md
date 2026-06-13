@@ -202,6 +202,7 @@ ADMIN_URL=admin/
 DEBUG=True
 ALLOWED_HOSTS=127.0.0.1,localhost
 SERVER=local
+TRACK_SITE_VISIT_DURATION=True
 
 DJANGO_SUPERUSER_USERNAME=admin
 DJANGO_SUPERUSER_EMAIL=admin@example.com
@@ -234,6 +235,8 @@ TELEGRAM_CHAT_ID=your-telegram-chat-id
 
 - `SERVER=local` uses PostgreSQL with `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, and `DB_PORT`.
 - `SERVER=live` uses SQLite at `db.sqlite3` and ignores the PostgreSQL values.
+
+`TRACK_SITE_VISIT_DURATION`: Set to `False` to stop frequent duration API calls and duration database updates. Visit counts and site-visit notifications continue to work.
 
 `DJANGO_SUPERUSER_*`: Useful when creating a superuser with Django's non-interactive `createsuperuser --noinput`.
 
@@ -588,6 +591,8 @@ The app records:
 - first visited time
 - last visited time
 - total duration seconds
+
+Set `TRACK_SITE_VISIT_DURATION=False` in `.env` to disable only total-duration tracking. The visit count and site-visit email/Telegram notifications continue to work.
 
 If you want to stop notifications for a visitor/IP, open `User Site Visits` in admin and set `is_active=False`.
 

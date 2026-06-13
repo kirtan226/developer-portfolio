@@ -7,7 +7,7 @@
 <section
     id="home"
     class="portfolio-shell container-fluid"
-    {% if site_visit %}
+    {% if site_visit and track_site_visit_duration %}
     data-site-visit-id="{{ site_visit.id }}"
     data-site-visit-duration-url="{% url 'site_visit_duration_api' %}"
     {% endif %}
