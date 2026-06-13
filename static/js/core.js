@@ -271,6 +271,32 @@
         return csrfInput ? csrfInput.value : "";
     }
 
+    function scheduleSiteVisitNotification() {
+        const notifier = document.querySelector("[data-site-visit-id][data-site-visit-notify-url]");
+
+        if (!notifier) {
+            return;
+        }
+
+        const delay = parseInt(notifier.dataset.siteVisitAlertDelay, 10) || 0;
+
+        window.setTimeout(function () {
+            const formData = new FormData();
+            formData.append("site_visit_id", notifier.dataset.siteVisitId);
+            formData.append("is_new_visit", notifier.dataset.siteVisitIsNew);
+            formData.append("csrfmiddlewaretoken", getCsrfToken());
+
+            fetch(notifier.dataset.siteVisitNotifyUrl, {
+                method: "POST",
+                body: formData,
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json",
+                },
+            }).catch(function () {});
+        }, delay);
+    }
+
     function startSiteVisitDurationTracking() {
         if (!siteVisitTracker) {
             return;
@@ -320,6 +346,7 @@
         window.addEventListener("pagehide", sendDuration);
     }
 
+    scheduleSiteVisitNotification();
     startSiteVisitDurationTracking();
 
     const contactForm = document.querySelector(".contact-form");

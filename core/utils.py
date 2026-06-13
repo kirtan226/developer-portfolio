@@ -303,6 +303,9 @@ def format_duration(seconds):
 
 
 def send_telegram_notification(message):
+    if not settings.SEND_TELEGRAM_ALERTS:
+        return False
+
     bot_token = settings.TELEGRAM_BOT_TOKEN
     chat_id = settings.TELEGRAM_CHAT_ID
 
@@ -535,7 +538,13 @@ def send_contact_notifications(contact_submission, profile):
         except Exception as exc:
             email_error = str(exc)
 
-    if notification_setting and notification_setting.telegram_notification:
+    telegram_enabled = bool(
+        settings.SEND_TELEGRAM_ALERTS
+        and notification_setting
+        and notification_setting.telegram_notification
+    )
+
+    if telegram_enabled:
         try:
             telegram_sent = send_contact_telegram_notification(contact_submission)
             if not telegram_sent:
@@ -552,7 +561,7 @@ def send_contact_notifications(contact_submission, profile):
         'email_error': email_error,
         'telegram_error': telegram_error,
         'email_enabled': bool(notification_setting and notification_setting.email_notification),
-        'telegram_enabled': bool(notification_setting and notification_setting.telegram_notification),
+        'telegram_enabled': telegram_enabled,
     }
 
 
@@ -574,7 +583,11 @@ def send_site_visit_notifications(site_visit, profile, is_new_visit):
         except Exception as exc:
             result['email_error'] = str(exc)
 
-    if notification_setting and notification_setting.telegram_notification:
+    if (
+        settings.SEND_TELEGRAM_ALERTS
+        and notification_setting
+        and notification_setting.telegram_notification
+    ):
         try:
             result['telegram_sent'] = send_telegram_notification(
                 build_site_visit_telegram_message(site_visit, is_new_visit),

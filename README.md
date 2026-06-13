@@ -203,6 +203,7 @@ DEBUG=True
 ALLOWED_HOSTS=127.0.0.1,localhost
 SERVER=local
 TRACK_SITE_VISIT_DURATION=True
+SITE_VISIT_ALERT_DELAY_SECONDS=10
 
 DJANGO_SUPERUSER_USERNAME=admin
 DJANGO_SUPERUSER_EMAIL=admin@example.com
@@ -217,6 +218,7 @@ DB_PORT=5432
 EMAIL_HOST_USER=your-gmail-address@gmail.com
 EMAIL_HOST_PASSWORD=your-gmail-app-password
 
+SEND_TELEGRAM_ALERTS=True
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 TELEGRAM_CHAT_ID=your-telegram-chat-id
 ```
@@ -238,11 +240,15 @@ TELEGRAM_CHAT_ID=your-telegram-chat-id
 
 `TRACK_SITE_VISIT_DURATION`: Set to `False` to stop frequent duration API calls and duration database updates. Visit counts and site-visit notifications continue to work.
 
+`SITE_VISIT_ALERT_DELAY_SECONDS`: Seconds to wait after page load before requesting site-visit email/Telegram alerts. Visitors who leave before the delay do not generate an alert.
+
 `DJANGO_SUPERUSER_*`: Useful when creating a superuser with Django's non-interactive `createsuperuser --noinput`.
 
 `EMAIL_HOST_USER`: Gmail address used as sender.
 
 `EMAIL_HOST_PASSWORD`: Gmail app password. Do not use your normal Gmail password.
+
+`SEND_TELEGRAM_ALERTS`: Global Telegram alert switch. Telegram sends only when this is `True` and the matching Notification Setting model's `telegram_notification` field is enabled.
 
 `TELEGRAM_BOT_TOKEN`: Token from BotFather.
 

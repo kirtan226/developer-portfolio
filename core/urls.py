@@ -6,6 +6,7 @@ from .views import (
     profile_detail_api,
     share_icon_svg,
     site_visit_duration_api,
+    site_visit_notify_api,
     social_links_api,
 )
 
@@ -15,5 +16,6 @@ urlpatterns = [
     path('api/profile/', profile_detail_api, name='profile_detail_api'),
     path('api/social-links/', social_links_api, name='social_links_api'),
     path('api/contact/submit/', contact_submit_api, name='contact_submit_api'),
+    path('api/site-visit/notify/', site_visit_notify_api, name='site_visit_notify_api'),
     path('api/site-visit/duration/', site_visit_duration_api, name='site_visit_duration_api'),
 ]

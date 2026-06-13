@@ -27,6 +27,7 @@ from .models import (
     Skill,
     SkillCategory,
     SocialLink,
+    UserSiteVisit,
 )
 from .utils import (
     add_site_visit_duration,
@@ -805,17 +806,18 @@ class HomeView(View):
 
     def get(self, request, *args, **kwargs):
         site_visit = None
+        is_new_visit = False
 
         try:
             site_visit, is_new_visit = record_site_visit(request)
-            if site_visit.is_active:
-                send_site_visit_notifications(site_visit, get_active_profile(), is_new_visit)
         except (DatabaseError, OperationalError, ProgrammingError):
             site_visit = None
 
         context = self.build_context(request=request)
         context['site_visit'] = site_visit
+        context['is_new_visit'] = is_new_visit
         context['track_site_visit_duration'] = settings.TRACK_SITE_VISIT_DURATION
+        context['site_visit_alert_delay_ms'] = settings.SITE_VISIT_ALERT_DELAY_SECONDS * 1000
         return render(request, self.template_name, context)
 
 
@@ -874,6 +876,31 @@ def contact_submit_api(request):
             'message': f'Your message was saved, but email delivery failed: {error_message}',
             'errors': {},
         }, status=500)
+
+
+@require_POST
+def site_visit_notify_api(request):
+    site_visit_id = request.POST.get('site_visit_id', '')
+
+    if not site_visit_id.isdigit():
+        return JsonResponse({'ok': False})
+
+    site_visit = UserSiteVisit.objects.filter(
+        id=site_visit_id,
+        is_active=True,
+    ).first()
+
+    if not site_visit:
+        return JsonResponse({'ok': False})
+
+    is_new_visit = request.POST.get('is_new_visit') == 'true'
+    result = send_site_visit_notifications(site_visit, get_active_profile(), is_new_visit)
+
+    return JsonResponse({
+        'ok': True,
+        'email_sent': result['email_sent'],
+        'telegram_sent': result['telegram_sent'],
+    })
 
 
 @require_POST

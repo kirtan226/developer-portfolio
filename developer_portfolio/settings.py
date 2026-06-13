@@ -40,11 +40,19 @@ def env_list(name, default=''):
     return [item.strip() for item in value.split(',') if item.strip()]
 
 
+def env_non_negative_int(name, default=0):
+    try:
+        return max(0, int(os.environ.get(name, default)))
+    except (TypeError, ValueError):
+        return default
+
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_bool('DEBUG', False)
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', '127.0.0.1,localhost')
 TRACK_SITE_VISIT_DURATION = env_bool('TRACK_SITE_VISIT_DURATION', False)
+SITE_VISIT_ALERT_DELAY_SECONDS = env_non_negative_int('SITE_VISIT_ALERT_DELAY_SECONDS', 10)
 
 
 def normalize_url_path(value, default):
@@ -204,6 +212,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # ==== Telegram configurations ====
 
+SEND_TELEGRAM_ALERTS = env_bool('SEND_TELEGRAM_ALERTS', False)
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
 
