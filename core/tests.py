@@ -87,41 +87,56 @@ class TelegramAlertFlagTests(TestCase):
 
 
 class SiteVisitNotifyApiTests(TestCase):
-    def setUp(self):
-        self.site_visit = UserSiteVisit.objects.create(
+    @patch('core.views.record_site_visit')
+    @patch('core.views.send_site_visit_notifications')
+    def test_records_visit_then_sends_notification(
+        self,
+        send_notifications_mock,
+        record_site_visit_mock,
+    ):
+        site_visit = UserSiteVisit(
+            id=42,
             ip_address='203.0.113.20',
             browser_name='Firefox',
-            last_visited_at=timezone.now(),
+            is_active=True,
         )
-
-    @patch('core.views.send_site_visit_notifications')
-    def test_sends_notification_for_active_visit(self, send_notifications_mock):
+        record_site_visit_mock.return_value = (site_visit, True)
         send_notifications_mock.return_value = {
             'email_sent': False,
             'telegram_sent': True,
         }
 
-        response = self.client.post(reverse('site_visit_notify_api'), {
-            'site_visit_id': self.site_visit.id,
-            'is_new_visit': 'true',
-        })
+        response = self.client.post(reverse('site_visit_notify_api'))
 
         self.assertJSONEqual(response.content, {
             'ok': True,
+            'site_visit_id': 42,
             'email_sent': False,
             'telegram_sent': True,
         })
         send_notifications_mock.assert_called_once()
 
+    @patch('core.views.record_site_visit')
     @patch('core.views.send_site_visit_notifications')
-    def test_does_not_send_notification_for_inactive_visit(self, send_notifications_mock):
-        self.site_visit.is_active = False
-        self.site_visit.save(update_fields=['is_active'])
+    def test_does_not_send_notification_for_inactive_visit(
+        self,
+        send_notifications_mock,
+        record_site_visit_mock,
+    ):
+        site_visit = UserSiteVisit(
+            id=42,
+            ip_address='203.0.113.20',
+            browser_name='Firefox',
+            is_active=False,
+        )
+        record_site_visit_mock.return_value = (site_visit, False)
 
-        response = self.client.post(reverse('site_visit_notify_api'), {
-            'site_visit_id': self.site_visit.id,
-            'is_new_visit': 'true',
+        response = self.client.post(reverse('site_visit_notify_api'))
+
+        self.assertJSONEqual(response.content, {
+            'ok': True,
+            'site_visit_id': 42,
+            'email_sent': False,
+            'telegram_sent': False,
         })
-
-        self.assertJSONEqual(response.content, {'ok': False})
         send_notifications_mock.assert_not_called()

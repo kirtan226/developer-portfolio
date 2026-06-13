@@ -7,15 +7,9 @@
 <section
     id="home"
     class="portfolio-shell container-fluid"
-    {% if site_visit %}
-    data-site-visit-id="{{ site_visit.id }}"
-    {% endif %}
-    {% if site_visit and site_visit.is_active %}
     data-site-visit-notify-url="{% url 'site_visit_notify_api' %}"
-    data-site-visit-is-new="{{ is_new_visit|yesno:'true,false' }}"
     data-site-visit-alert-delay="{{ site_visit_alert_delay_ms }}"
-    {% endif %}
-    {% if site_visit and track_site_visit_duration %}
+    {% if track_site_visit_duration %}
     data-site-visit-duration-url="{% url 'site_visit_duration_api' %}"
     {% endif %}
 >

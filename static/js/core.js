@@ -264,46 +264,51 @@
             });
         });
 
-    const siteVisitTracker = document.querySelector("[data-site-visit-id][data-site-visit-duration-url]");
+    const siteVisitTracker = document.querySelector("[data-site-visit-notify-url]");
 
     function getCsrfToken() {
         const csrfInput = document.querySelector("[name='csrfmiddlewaretoken']");
         return csrfInput ? csrfInput.value : "";
     }
 
-    function scheduleSiteVisitNotification() {
-        const notifier = document.querySelector("[data-site-visit-id][data-site-visit-notify-url]");
-
-        if (!notifier) {
+    function startSiteVisitTracking() {
+        if (!siteVisitTracker) {
             return;
         }
 
-        const delay = parseInt(notifier.dataset.siteVisitAlertDelay, 10) || 0;
+        const delay = parseInt(siteVisitTracker.dataset.siteVisitAlertDelay, 10) || 0;
 
         window.setTimeout(function () {
             const formData = new FormData();
-            formData.append("site_visit_id", notifier.dataset.siteVisitId);
-            formData.append("is_new_visit", notifier.dataset.siteVisitIsNew);
             formData.append("csrfmiddlewaretoken", getCsrfToken());
 
-            fetch(notifier.dataset.siteVisitNotifyUrl, {
+            fetch(siteVisitTracker.dataset.siteVisitNotifyUrl, {
                 method: "POST",
                 body: formData,
                 headers: {
                     "X-Requested-With": "XMLHttpRequest",
                     "Accept": "application/json",
                 },
-            }).catch(function () {});
+            })
+                .then(function (response) {
+                    return response.ok ? response.json() : null;
+                })
+                .then(function (result) {
+                    if (result && result.ok && result.site_visit_id) {
+                        startSiteVisitDurationTracking(String(result.site_visit_id));
+                    }
+                })
+                .catch(function () {});
         }, delay);
     }
 
-    function startSiteVisitDurationTracking() {
-        if (!siteVisitTracker) {
+    function startSiteVisitDurationTracking(siteVisitId) {
+        const durationUrl = siteVisitTracker.dataset.siteVisitDurationUrl;
+
+        if (!durationUrl) {
             return;
         }
 
-        const siteVisitId = siteVisitTracker.dataset.siteVisitId;
-        const durationUrl = siteVisitTracker.dataset.siteVisitDurationUrl;
         let lastSentAt = Date.now();
 
         function sendDuration() {
@@ -346,8 +351,7 @@
         window.addEventListener("pagehide", sendDuration);
     }
 
-    scheduleSiteVisitNotification();
-    startSiteVisitDurationTracking();
+    startSiteVisitTracking();
 
     const contactForm = document.querySelector(".contact-form");
     const contactStatus = document.querySelector("[data-contact-status]");

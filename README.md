@@ -217,6 +217,7 @@ DB_PORT=5432
 
 EMAIL_HOST_USER=your-gmail-address@gmail.com
 EMAIL_HOST_PASSWORD=your-gmail-app-password
+EMAIL_TIMEOUT_SECONDS=10
 
 SEND_TELEGRAM_ALERTS=True
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
@@ -247,6 +248,8 @@ TELEGRAM_CHAT_ID=your-telegram-chat-id
 `EMAIL_HOST_USER`: Gmail address used as sender.
 
 `EMAIL_HOST_PASSWORD`: Gmail app password. Do not use your normal Gmail password.
+
+`EMAIL_TIMEOUT_SECONDS`: Maximum seconds an email connection may block a web worker.
 
 `SEND_TELEGRAM_ALERTS`: Global Telegram alert switch. Telegram sends only when this is `True` and the matching Notification Setting model's `telegram_notification` field is enabled.
 
