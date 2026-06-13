@@ -1,4 +1,5 @@
 from django.http import HttpResponse, JsonResponse
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.shortcuts import render
@@ -12,6 +13,7 @@ from django.db.utils import DatabaseError, OperationalError, ProgrammingError
 from django.db.models import Prefetch
 
 import json
+from copy import deepcopy
 
 from django.conf import settings
 
@@ -589,6 +591,7 @@ def validate_contact_form_data(contact_form):
 
 class HomeView(View):
     template_name = 'core/home.html'
+    context_cache_key = 'core.home_context.v1'
 
     def build_context(self, request=None, contact_status=None, contact_form=None, contact_errors=None):
         profile = get_active_profile()
@@ -804,7 +807,22 @@ class HomeView(View):
         return context
 
     def get(self, request, *args, **kwargs):
-        context = self.build_context(request=request)
+        context = cache.get(self.context_cache_key)
+
+        if context is None:
+            context = self.build_context()
+            cache.set(
+                self.context_cache_key,
+                context,
+                timeout=settings.HOME_CONTEXT_CACHE_SECONDS,
+            )
+
+        context = deepcopy(context)
+        context['share_metadata'] = build_share_metadata(
+            request,
+            context['page_title'],
+            context['about']['intro']['description'],
+        )
         context['track_site_visit_duration'] = settings.TRACK_SITE_VISIT_DURATION
         context['site_visit_alert_delay_ms'] = settings.SITE_VISIT_ALERT_DELAY_SECONDS * 1000
         return render(request, self.template_name, context)

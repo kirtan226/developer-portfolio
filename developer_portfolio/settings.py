@@ -53,6 +53,7 @@ DEBUG = env_bool('DEBUG', False)
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', '127.0.0.1,localhost')
 TRACK_SITE_VISIT_DURATION = env_bool('TRACK_SITE_VISIT_DURATION', False)
 SITE_VISIT_ALERT_DELAY_SECONDS = env_non_negative_int('SITE_VISIT_ALERT_DELAY_SECONDS', 10)
+HOME_CONTEXT_CACHE_SECONDS = env_non_negative_int('HOME_CONTEXT_CACHE_SECONDS', 86400)
 
 
 def normalize_url_path(value, default):
@@ -121,6 +122,9 @@ if SERVER == 'live':
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+            'OPTIONS': {
+                'timeout': env_non_negative_int('SQLITE_TIMEOUT_SECONDS', 1),
+            },
         }
     }
 else:

@@ -204,6 +204,8 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 SERVER=local
 TRACK_SITE_VISIT_DURATION=True
 SITE_VISIT_ALERT_DELAY_SECONDS=10
+SQLITE_TIMEOUT_SECONDS=1
+HOME_CONTEXT_CACHE_SECONDS=86400
 
 DJANGO_SUPERUSER_USERNAME=admin
 DJANGO_SUPERUSER_EMAIL=admin@example.com
@@ -242,6 +244,10 @@ TELEGRAM_CHAT_ID=your-telegram-chat-id
 `TRACK_SITE_VISIT_DURATION`: Set to `False` to stop frequent duration API calls and duration database updates. Visit counts and site-visit notifications continue to work.
 
 `SITE_VISIT_ALERT_DELAY_SECONDS`: Seconds to wait after page load before requesting site-visit email/Telegram alerts. Visitors who leave before the delay do not generate an alert.
+
+`SQLITE_TIMEOUT_SECONDS`: Maximum seconds each SQLite query waits for a database lock when `SERVER=live`. A short timeout prevents multiple home-page queries from accumulating into a long request.
+
+`HOME_CONTEXT_CACHE_SECONDS`: Seconds to cache database-built portfolio content in each web process. The default `86400` caches it for one day without Redis. Reload the web app after admin content changes to clear it immediately.
 
 `DJANGO_SUPERUSER_*`: Useful when creating a superuser with Django's non-interactive `createsuperuser --noinput`.
 
